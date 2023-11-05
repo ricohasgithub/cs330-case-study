@@ -5,6 +5,7 @@ import json
 
 from collections import defaultdict
 from datetime import datetime, timedelta
+import time as timer
 
 class BaseMatcher:
 
@@ -14,6 +15,9 @@ class BaseMatcher:
         self.passengers = read_passengers("./case_study/data/passengers.csv")
         # Stores nearest node for each driver -- eventually implement k-means clustering
         self.nearest_nodes = dict()
+        # Metrics to measure performance in alignment with desiderata
+        self.d1 = 0
+        self.d2 = 0
 
     def update_driver(self, id, time, lat, lon):
         self.drivers[id] = {"time": time,
@@ -40,12 +44,21 @@ class BaseMatcher:
         self.nearest_nodes[driver] = dest_node
 
         # Calculate driving time for driver to reach passenger
-        time = self.map.get_time(driver_node, passenger_node)
-        new_time = timedelta(hours=time) + max(self.drivers[driver]["time"], self.passengers[passenger]["time"])
+        pickup_time = self.map.get_time(driver_node, passenger_node)
+        # Time to get to pickup location is start time + time to drive to pickup location
+        new_time = timedelta(hours=pickup_time) + max(self.drivers[driver]["time"], self.passengers[passenger]["time"])
 
         # Calculate driving time from passenger to their destination
-        time = self.map.get_time(passenger_node, dest_node)
-        new_time = timedelta(hours=time) + new_time
+        driving_time = self.map.get_time(passenger_node, dest_node)
+        # Start time at pickup location + time to drive to arrival location
+        # So this is just dropoff time
+        new_time = timedelta(hours=driving_time) + new_time
+
+        # Final arrival time - passenger login time
+        self.d1 += ((new_time - self.passengers[passenger]["time"]).total_seconds() / 60)
+        self.d2 += (driving_time - pickup_time) * 60
+        print("D1: ", (new_time - self.passengers[passenger]["time"]).total_seconds() / 60)
+        print("D2: ", (driving_time - pickup_time) * 60)
 
         # Update dictionary entry for driver time and position
         self.update_driver(driver, new_time, self.map.node_to_latlon[dest_node]["lat"], self.map.node_to_latlon[dest_node]["lon"])
@@ -106,7 +119,7 @@ class RoadNetwork:
                                                          self.node_to_latlon[v]["lat"],
                                                          self.node_to_latlon[v]["lon"])
                     heapq.heappush(pq, (v_cost, v))
-
+        
         return dist[u]
 
 # Read and parse adjacency.json as an adjacency list
@@ -119,11 +132,10 @@ def read_adjacency(path):
             for end_node_id, end_node_data in end_node_datum.items():
                 # Build adjacency matrix view of graph edges
                 graph[start_node_id].append(end_node_id)
-                # Check to see if we have a multigraph
-                if len(edge_data[(start_node_id, end_node_id)]) != 0:
-                    print("Multigraph")
+                graph[end_node_id].append(start_node_id)
                 # Build lookup table for edge data/weights
                 edge_data[(start_node_id, end_node_id)] = end_node_data
+                edge_data[(end_node_id, start_node_id)] = end_node_data
     return graph, edge_data
 
 # Read and parse node_data.json as a lookup table
