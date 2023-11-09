@@ -11,8 +11,8 @@ class BaseMatcher:
 
     def __init__(self):
         self.map = RoadNetwork()
-        self.drivers = read_drivers("./case_study/data/drivers.csv")
-        self.passengers = read_passengers("./case_study/data/passengers.csv")
+        self.drivers = read_drivers("data/drivers.csv")
+        self.passengers = read_passengers("data/passengers.csv")
         # Stores nearest node for each driver -- eventually implement k-means clustering
         self.nearest_nodes = dict()
         # Metrics to measure performance in alignment with desiderata
@@ -22,7 +22,8 @@ class BaseMatcher:
     def update_driver(self, id, time, lat, lon):
         self.drivers[id] = {"time": time,
                             "source_lat": lat, "source_lon": lon}
-        
+    
+    # Override if neccesary
     def get_closest_nodes(self, lat, lon):
         # Linearly search through all vertices in self.map and see which one has the least distance 
         min_distance, nearest = float("inf"), None
@@ -34,7 +35,7 @@ class BaseMatcher:
         return nearest
 
     # Override if neccesary
-    def complete_ride(self, driver, passenger):
+    def complete_ride(self, driver, passenger, heuristic="euclidean"):
         # Find closest nodes to each of driver and passenger
         driver_node = self.get_closest_nodes(self.drivers[driver]["source_lat"], self.drivers[driver]["source_lon"]) if not driver in self.nearest_nodes.keys() else self.nearest_nodes[driver]
         passenger_node = self.get_closest_nodes(self.passengers[passenger]["source_lat"], self.passengers[passenger]["source_lon"])
@@ -43,13 +44,16 @@ class BaseMatcher:
         # Update the closest node to the driver to the passenger's destination node
         self.nearest_nodes[driver] = dest_node
 
+        # Calculate starting drive hour
+        hour = max(self.drivers[driver]["time"].hour, self.passengers[passenger]["time"].hour)
+
         # Calculate driving time for driver to reach passenger
-        pickup_time = self.map.get_time(driver_node, passenger_node)
+        pickup_time = self.map.get_time(driver_node, passenger_node, hour, heuristic=heuristic)
         # Time to get to pickup location is start time + time to drive to pickup location
         new_time = timedelta(hours=pickup_time) + max(self.drivers[driver]["time"], self.passengers[passenger]["time"])
 
         # Calculate driving time from passenger to their destination
-        driving_time = self.map.get_time(passenger_node, dest_node)
+        driving_time = self.map.get_time(passenger_node, dest_node, hour, heuristic=heuristic)
         # Start time at pickup location + time to drive to arrival location
         # So this is just dropoff time
         new_time = timedelta(hours=driving_time) + new_time
@@ -73,14 +77,14 @@ class RoadNetwork:
 
     def __init__(self):
         # TODO: implement Floyd-Warshall to find shortest paths between all pairs of nodes
-        self.graph, self.edge_data = read_adjacency("./case_study/data/adjacency.json")
-        self.node_to_latlon = read_node_data("./case_study/data/node_data.json")
+        self.graph, self.edge_data = read_adjacency("data/adjacency.json")
+        self.node_to_latlon = read_node_data("data/node_data.json")
 
     def get_neighbors(self, u):
         return self.graph[u]
     
-    def get_edge_data(self, u, v, query=None):
-        return self.edge_data[(u, v)] if query == None else self.edge_data[(u, v)][query]
+    def get_edge_data(self, u, v, hour, query=None):
+        return self.edge_data[(u, v)][hour] if query == None else self.edge_data[(u, v)][hour][query]
     
     # Get distance between a node and a coordinate
     def get_distance(self, u, lat, lon):
@@ -96,7 +100,7 @@ class RoadNetwork:
     
     # This method computes the shortest time needed for the driver to reach
     # a passenger at some (lat, lon) coord. Default implementation is A* with a euclidean heuristic
-    def get_time(self, s, t):
+    def get_time(self, s, t, hour, heuristic="euclidean"):
         # We model the road network as a weighted graph where the edge weights are travel times
         # return the minimum shortest path for minimum time to go from s to t
         pq, dist = [(0, s)], dict()
@@ -111,13 +115,16 @@ class RoadNetwork:
             # Add all neighbors to the search queue
             for v in self.graph[u]:
                 # We can still relax this edge
-                if dist[v] > dist[u] + self.get_edge_data(u, v, "time"):
+                if dist[v] > dist[u] + self.get_edge_data(u, v, hour, "time"):
                     # dist[v] = dist[u] + w(u -> v)
-                    dist[v] = dist[u] + self.get_edge_data(u, v, "time")
-                    # Note that h is the euclidean distance, so we just call get_distance to t
-                    v_cost = dist[v] + self.get_distance(t, 
-                                                         self.node_to_latlon[v]["lat"],
-                                                         self.node_to_latlon[v]["lon"])
+                    dist[v] = dist[u] + self.get_edge_data(u, v, hour, "time")
+                    if heuristic == "euclidean":
+                        # Note that h is the euclidean distance, so we just call get_distance to t
+                        v_cost = dist[v] + self.get_distance(t, 
+                                                            self.node_to_latlon[v]["lat"],
+                                                            self.node_to_latlon[v]["lon"])
+                    elif heuristic == "djikstras":
+                        v_cost = dist[v]
                     heapq.heappush(pq, (v_cost, v))
         
         return dist[u]
@@ -125,7 +132,7 @@ class RoadNetwork:
 # Read and parse adjacency.json as an adjacency list
 def read_adjacency(path):
     graph = defaultdict(list)
-    edge_data = defaultdict(dict)
+    edge_data = defaultdict(lambda: defaultdict(dict))
     with open(path, "r") as file:
         data = json.load(file)
         for start_node_id, end_node_datum in data.items():
@@ -134,8 +141,10 @@ def read_adjacency(path):
                 graph[start_node_id].append(end_node_id)
                 graph[end_node_id].append(start_node_id)
                 # Build lookup table for edge data/weights
-                edge_data[(start_node_id, end_node_id)] = end_node_data
-                edge_data[(end_node_id, start_node_id)] = end_node_data
+                for hour_of_the_day_data in end_node_data:
+                    hour = hour_of_the_day_data["hour"]
+                    edge_data[(start_node_id, end_node_id)][hour] = hour_of_the_day_data
+    print("Completed reading adjacency.json")
     return graph, edge_data
 
 # Read and parse node_data.json as a lookup table
