@@ -6,6 +6,7 @@ import json
 from collections import defaultdict
 from datetime import datetime, timedelta
 import time as timer
+import time as timer
 
 class BaseMatcher:
 
@@ -13,15 +14,22 @@ class BaseMatcher:
         self.map = RoadNetwork()
         self.drivers = read_drivers("data/drivers.csv")
         self.passengers = read_passengers("data/passengers.csv")
+        self.drivers = read_drivers("data/drivers.csv")
+        self.passengers = read_passengers("data/passengers.csv")
         # Stores nearest node for each driver -- eventually implement k-means clustering
         self.nearest_nodes = dict()
         # Metrics to measure performance in alignment with desiderata
         self.d1 = 0
         self.d2 = 0
+        # Metrics to measure performance in alignment with desiderata
+        self.d1 = 0
+        self.d2 = 0
 
-    def update_driver(self, id, time, lat, lon):
-        self.drivers[id] = {"time": time,
+    def update_driver(self, id, time, rides, lat, lon):
+        self.drivers[id] = {"time": time, "rides": rides,
                             "source_lat": lat, "source_lon": lon}
+    
+    # Override if neccesary
     
     # Override if neccesary
     def get_closest_nodes(self, lat, lon):
@@ -47,7 +55,13 @@ class BaseMatcher:
         # Calculate starting drive hour
         hour = max(self.drivers[driver]["time"].hour, self.passengers[passenger]["time"].hour)
 
+        # Calculate starting drive hour
+        hour = max(self.drivers[driver]["time"].hour, self.passengers[passenger]["time"].hour)
+
         # Calculate driving time for driver to reach passenger
+        pickup_time = self.map.get_time(driver_node, passenger_node, hour, heuristic=heuristic)
+        # Time to get to pickup location is start time + time to drive to pickup location
+        new_time = timedelta(hours=pickup_time) + max(self.drivers[driver]["time"], self.passengers[passenger]["time"])
         pickup_time = self.map.get_time(driver_node, passenger_node, hour, heuristic=heuristic)
         # Time to get to pickup location is start time + time to drive to pickup location
         new_time = timedelta(hours=pickup_time) + max(self.drivers[driver]["time"], self.passengers[passenger]["time"])
@@ -64,8 +78,10 @@ class BaseMatcher:
         print("D1: ", (new_time - self.passengers[passenger]["time"]).total_seconds() / 60)
         print("D2: ", (driving_time - pickup_time) * 60)
 
+        # Increment the number of rides the driver has completed
+        rides = self.drivers[driver]["rides"] + 1
         # Update dictionary entry for driver time and position
-        self.update_driver(driver, new_time, self.map.node_to_latlon[dest_node]["lat"], self.map.node_to_latlon[dest_node]["lon"])
+        self.update_driver(driver, new_time, rides, self.map.node_to_latlon[dest_node]["lat"], self.map.node_to_latlon[dest_node]["lon"])
 
     # Override implementation for each T_i algorithm
     # This method takes in a passenger and returns the "best" driver to match
@@ -79,10 +95,14 @@ class RoadNetwork:
         # TODO: implement Floyd-Warshall to find shortest paths between all pairs of nodes
         self.graph, self.edge_data = read_adjacency("data/adjacency.json")
         self.node_to_latlon = read_node_data("data/node_data.json")
+        self.graph, self.edge_data = read_adjacency("data/adjacency.json")
+        self.node_to_latlon = read_node_data("data/node_data.json")
 
     def get_neighbors(self, u):
         return self.graph[u]
     
+    def get_edge_data(self, u, v, hour, query=None):
+        return self.edge_data[(u, v)][hour] if query == None else self.edge_data[(u, v)][hour][query]
     def get_edge_data(self, u, v, hour, query=None):
         return self.edge_data[(u, v)][hour] if query == None else self.edge_data[(u, v)][hour][query]
     
@@ -125,13 +145,23 @@ class RoadNetwork:
                                                             self.node_to_latlon[v]["lon"])
                     elif heuristic == "djikstras":
                         v_cost = dist[v]
+                    dist[v] = dist[u] + self.get_edge_data(u, v, hour, "time")
+                    if heuristic == "euclidean":
+                        # Note that h is the euclidean distance, so we just call get_distance to t
+                        v_cost = dist[v] + self.get_distance(t, 
+                                                            self.node_to_latlon[v]["lat"],
+                                                            self.node_to_latlon[v]["lon"])
+                    elif heuristic == "djikstras":
+                        v_cost = dist[v]
                     heapq.heappush(pq, (v_cost, v))
+        
         
         return dist[u]
 
 # Read and parse adjacency.json as an adjacency list
 def read_adjacency(path):
     graph = defaultdict(list)
+    edge_data = defaultdict(lambda: defaultdict(dict))
     edge_data = defaultdict(lambda: defaultdict(dict))
     with open(path, "r") as file:
         data = json.load(file)
@@ -170,7 +200,7 @@ def read_drivers(path):
                 date_time = datetime.strptime(data[0], "%m/%d/%Y %H:%M:%S")
                 source_lat = float(data[1])
                 source_lon = float(data[2])
-                drivers[index] = {"time": date_time,
+                drivers[index] = {"time": date_time, "rides": 0,
                                   "source_lat": source_lat, "source_lon": source_lon}
                 index += 1
     return drivers
