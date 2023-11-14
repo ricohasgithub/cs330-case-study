@@ -2,6 +2,7 @@
 import heapq
 import math
 import time
+import random
 
 from utils import *
 from quad_tree import *
@@ -28,13 +29,15 @@ class T1_Matcher(BaseMatcher):
     # Get best driver for a given passenger by finding first availible driver
     def match(self, availible_drivers, passenger_id):
         # Get the first driver availible
-        start_time, driver_id, _, _ = heapq.heappop(availible_drivers)
-        # Process driver pick up and drop off
-        self.complete_ride(driver_id, passenger_id)
-        # Re-queue into priority queue with end time of drop off and end position
-        heapq.heappush(self.drivers_pq, (self.drivers[driver_id]["time"],
-                                         driver_id,
-                                         self.drivers[driver_id]["source_lat"], self.drivers[driver_id]["source_lon"]))
+        start_time, driver_id, _, _ = availible_drivers.popleft()
+        # Process driver pick up and drop off; also get whether the driver returns for more rides
+        driver_return_to_road = self.complete_ride(driver_id, passenger_id)
+        
+        if driver_return_to_road:
+            # Re-queue into priority queue with end time of drop off and end position
+            heapq.heappush(self.drivers_pq, (self.drivers[driver_id]["time"],
+                                             driver_id,
+                                             self.drivers[driver_id]["source_lat"], self.drivers[driver_id]["source_lon"]))
 
 class T2_Matcher(BaseMatcher):
 
@@ -75,12 +78,12 @@ class T2_Matcher(BaseMatcher):
 
         driver_id = availible_drivers[min_driver][1]
         del availible_drivers[min_driver]
-        self.complete_ride(driver_id, passenger_id)
+        driver_return_to_road = self.complete_ride(driver_id, passenger_id)
 
-        heapq.heappush(self.drivers_pq, (self.drivers[driver_id]["time"],
-                                         driver_id,
-                                         self.drivers[driver_id]["source_lat"], self.drivers[driver_id]["source_lon"]))    
-
+        if driver_return_to_road:
+            heapq.heappush(self.drivers_pq, (self.drivers[driver_id]["time"],
+                                            driver_id,
+                                            self.drivers[driver_id]["source_lat"], self.drivers[driver_id]["source_lon"]))    
 
 class T3_Matcher(BaseMatcher):
 
@@ -150,17 +153,17 @@ class T3_Matcher(BaseMatcher):
 
             driver_id = availible_drivers[min_driver][1]
             del availible_drivers[min_driver]
-            self.complete_ride(driver_id, passenger_id)
+            driver_return_to_road = self.complete_ride(driver_id, passenger_id)
             
         else:
             driver_id = availible_drivers[0][1]
             del availible_drivers[0]
-            self.complete_ride(driver_id, passenger_id)
+            driver_return_to_road = self.complete_ride(driver_id, passenger_id)
 
-        heapq.heappush(self.drivers_pq, (self.drivers[driver_id]["time"],
-                                         driver_id,
-                                         self.drivers[driver_id]["source_lat"], self.drivers[driver_id]["source_lon"]))
-        
+        if driver_return_to_road:
+            heapq.heappush(self.drivers_pq, (self.drivers[driver_id]["time"],
+                                            driver_id,
+                                            self.drivers[driver_id]["source_lat"], self.drivers[driver_id]["source_lon"]))
 
 class T4_Matcher(BaseMatcher):
 
@@ -179,64 +182,44 @@ class T4_Matcher(BaseMatcher):
             # Insert time first so that heap sorts from min to max time
             heapq.heappush(self.drivers_pq, (data["time"], id,
                                              data["source_lat"], data["source_lon"]))
-
         # Sort coordinates by x-coordinate
         self.sorted_coordinates = sorted(self.map.node_to_latlon.items(), key=lambda x: x[1]["lon"])
+        self.nodes = list(self.map.graph.keys())
+        self.sorted_nodes = sorted(self.nodes, key=lambda node: (node.lat, node.lon))
 
+    def get_closest_node_divide_and_conquer(self, lat, lon):
+        closest_node = self._closest_node_recursive(self.sorted_nodes, lat, lon)
+        return closest_node
 
-        # # Build a quad tree out of all nodes in the map
-        # min_lat, min_lon, max_lat, max_lon = self.get_map_bounds()
-        # boundary = Box((min_lat + max_lat) / 2, (min_lon + max_lon) / 2, abs(max_lat - min_lat), abs(max_lon - min_lon))
-        # self.quad_tree = QuadTree(boundary, 64)
-        # for node, data in self.map.node_to_latlon.items():
-        #     self.quad_tree.insert(Point(data["lat"], data["lon"], id=node))
+    def _closest_node_recursive(self, nodes, lat, lon):
+        if len(nodes) <= 3:
+            return min(nodes, key=lambda node: self.map.get_distance(node, lat, lon))
 
-    # Part of quad tree implementation
-    
-    # def get_map_bounds(self):
-    #     # Get min, max bounds for lat, lon over all nodes
-    #     min_lat, min_lon, max_lat, max_lon = float("inf"), float("inf"), float("-inf"), float("-inf")
-    #     for node, data in self.map.node_to_latlon.items():
-    #         min_lat = min(min_lat, data["lat"])
-    #         min_lon = min(min_lon, data["lon"])
-    #         max_lat = max(max_lat, data["lat"])
-    #         max_lon = max(max_lon, data["lon"])
-    #     return min_lat, min_lon, max_lat, max_lon
-    
-    def binary_search_closest_y(self, x_query):
-        # Binary search for the closest point by y-coordinate
-        left, right = 0, len(self.sorted_coordinates) - 1
-        closest_point = None
+        mid = len(nodes) // 2
+        mid_node = nodes[mid]
 
-        while left <= right:
-            mid = (left + right) // 2
-            current_point = self.sorted_coordinates[mid]
-            
-            if current_point[1]["lon"] == x_query:
-                return current_point  # Found an exact match
-                
-            if closest_point is None or abs(current_point[1]["lon"] - x_query) < abs(closest_point[1]["lon"] - x_query):
-                closest_point = current_point
+        left_nodes = nodes[:mid]
+        right_nodes = nodes[mid:]
 
-            if current_point[1]["lon"] < x_query:
-                left = mid + 1
-            else:
-                right = mid - 1
+        left_closest = self._closest_node_recursive(left_nodes, lat, lon)
+        right_closest = self._closest_node_recursive(right_nodes, lat, lon)
 
-        return closest_point
+        closest_in_strip = self._closest_in_strip(nodes, mid_node, lat, lon, min(left_closest, right_closest))
 
-    def get_closest_nodes_binary_search(self, lat, lon):
-        query_x = lon
-        closest_point = self.binary_search_closest_y(query_x)
-        return closest_point[0]  # Assuming the ID is stored at index 0 of the tuple
+        return min(left_closest, right_closest, closest_in_strip, key=lambda node: self.map.get_distance(node, lat, lon))
 
+    def _closest_in_strip(self, nodes, mid_node, lat, lon, min_distance):
+        strip = [node for node in nodes if mid_node.lat - min_distance <= node.lat <= mid_node.lat + min_distance]
+        strip = sorted(strip, key=lambda node: node.lon)
 
-    # Part of quad tree implementation
+        for i in range(len(strip)):
+            for j in range(i+1, min(i+7, len(strip))):
+                distance = self.map.get_distance(strip[i], lat, lon)
+                if distance < min_distance:
+                    min_distance = distance
 
-    # def get_closest_nodes(self, lat, lon):
-    #     query = Point(lat, lon, id=0)
-    #     closest_point, _ = self.quad_tree.find_closest_point(query)
-    #     return closest_point.id
+        return min_distance
+
     
     # Get best driver for a given passenger by finding first availible driver
     def match(self, availible_drivers, passenger_id):
@@ -268,7 +251,6 @@ class T4_Matcher(BaseMatcher):
                 execution_time = end_time - start_time
                 print(f"CLOSEST Execution time: {execution_time} seconds")
 
-
                 start_time = time.time()
 
                 # Calculate starting drive hour
@@ -286,16 +268,17 @@ class T4_Matcher(BaseMatcher):
 
             driver_id = availible_drivers[min_driver][1]
             del availible_drivers[min_driver]
-            self.complete_ride(driver_id, passenger_id)
+            driver_return_to_road = self.complete_ride(driver_id, passenger_id)
                 
         else:
             driver_id = availible_drivers[0][1]
             del availible_drivers[0]
-            self.complete_ride(driver_id, passenger_id)
+            driver_return_to_road = self.complete_ride(driver_id, passenger_id)
 
-        heapq.heappush(self.drivers_pq, (self.drivers[driver_id]["time"],
-                                         driver_id,
-                                         self.drivers[driver_id]["source_lat"], self.drivers[driver_id]["source_lon"]))
+        if driver_return_to_road:
+            heapq.heappush(self.drivers_pq, (self.drivers[driver_id]["time"],
+                                            driver_id,
+                                            self.drivers[driver_id]["source_lat"], self.drivers[driver_id]["source_lon"]))
 
 class T5_Matcher(BaseMatcher):
 
@@ -314,28 +297,6 @@ class T5_Matcher(BaseMatcher):
             # Insert time first so that heap sorts from min to max time
             heapq.heappush(self.drivers_pq, (data["time"], id,
                                              data["source_lat"], data["source_lon"]))
-
-        # Build a quad tree out of all nodes in the map
-        min_lat, min_lon, max_lat, max_lon = self.get_map_bounds()
-        boundary = Box((min_lat + max_lat) / 2, (min_lon + max_lon) / 2, abs(max_lat - min_lat), abs(max_lon - min_lon))
-        self.quad_tree = QuadTree(boundary, 64)
-        for node, data in self.map.node_to_latlon.items():
-            self.quad_tree.insert(Point(data["lat"], data["lon"], id=node))
-
-    def get_map_bounds(self):
-        # Get min, max bounds for lat, lon over all nodes
-        min_lat, min_lon, max_lat, max_lon = float("inf"), float("inf"), float("-inf"), float("-inf")
-        for node, data in self.map.node_to_latlon.items():
-            min_lat = min(min_lat, data["lat"])
-            min_lon = min(min_lon, data["lon"])
-            max_lat = max(max_lat, data["lat"])
-            max_lon = max(max_lon, data["lon"])
-        return min_lat, min_lon, max_lat, max_lon
-    
-    def get_closest_nodes(self, lat, lon):
-        query = Point(lat, lon, id=0)
-        closest_point, _ = self.quad_tree.find_closest_point(query)
-        return closest_point.id
     
     # Get best driver for a given passenger by finding first availible driver
     def match(self, availible_drivers, passenger_id):
@@ -385,13 +346,14 @@ class T5_Matcher(BaseMatcher):
 
             driver_id = availible_drivers[min_driver][1]
             del availible_drivers[min_driver]
-            self.complete_ride(driver_id, passenger_id)
+            driver_return_to_road = self.complete_ride(driver_id, passenger_id)
                 
         else:
             driver_id = availible_drivers[0][1]
             del availible_drivers[0]
-            self.complete_ride(driver_id, passenger_id)
+            driver_return_to_road = self.complete_ride(driver_id, passenger_id)
 
-        heapq.heappush(self.drivers_pq, (self.drivers[driver_id]["time"],
-                                         driver_id,
-                                         self.drivers[driver_id]["source_lat"], self.drivers[driver_id]["source_lon"]))
+        if driver_return_to_road:
+            heapq.heappush(self.drivers_pq, (self.drivers[driver_id]["time"],
+                                            driver_id,
+                                            self.drivers[driver_id]["source_lat"], self.drivers[driver_id]["source_lon"]))
