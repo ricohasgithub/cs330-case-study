@@ -25,6 +25,7 @@ curr_time = curr_unmatched_passengers[0][1]["time"]
 
 # Summary statistics
 plot = []
+start_time = time.time()
 
 # Begin simulation
 while len(unmatched_passengers) > 0 and len(curr_unmatched_passengers) > 0:
@@ -50,6 +51,10 @@ while len(unmatched_passengers) > 0 and len(curr_unmatched_passengers) > 0:
         curr_time = unmatched_passengers[0][1]["time"]
 
     print(len(unmatched_passengers), len(curr_unmatched_passengers))
+
+    end_time = time.time()
+    execution_time = end_time - start_time
+    print("T2 total runtime:", execution_time)
 
 # Plotting
 fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(10, 8))
@@ -81,3 +86,5 @@ plt.suptitle('Line Plots with Datetime on X-axis')
 
 # Show the plot
 plt.show()
+
+# 27 seconds for first 200 samples

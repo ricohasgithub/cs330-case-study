@@ -12,12 +12,12 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
 # Contains driver states for simulation
-t3_matcher = T3_Matcher()
+t5_matcher = T5_Matcher()
 
 # Priority queue of availible drivers
 availible_drivers = []
 # List of all unmatched passengers by increasing time
-unmatched_passengers = deque([[id, data] for id, data in t3_matcher.passengers.items()])
+unmatched_passengers = deque([[id, data] for id, data in t5_matcher.passengers.items()])
 # Unmatched at current time
 curr_unmatched_passengers = deque([unmatched_passengers.popleft()])
 # Time of simulation start is the time of the first passenger, since it is sorted by time increasing
@@ -32,8 +32,8 @@ while len(unmatched_passengers) > 0 and len(curr_unmatched_passengers) > 0:
     
     # Check to see if any new drivers have logged on
     # Add all drivers availible at current time to the availible drivers priority queue (sorted by increasing time)
-    while t3_matcher.drivers_pq[0][0] <= curr_time:
-        data = heapq.heappop(t3_matcher.drivers_pq)
+    while t5_matcher.drivers_pq[0][0] <= curr_time:
+        data = heapq.heappop(t5_matcher.drivers_pq)
         availible_drivers.append((data[0], data[1], data[2], data[3]))
 
     # Match all availible drivers to customers
@@ -41,8 +41,8 @@ while len(unmatched_passengers) > 0 and len(curr_unmatched_passengers) > 0:
         # Since curr_unmatched_passengers is sorted increasing by time
         # this will be the longest waiting passenger
         passenger = curr_unmatched_passengers.popleft()
-        t3_matcher.match(availible_drivers, passenger[0])
-        plot.append((curr_time, t3_matcher.d1, t3_matcher.d2))
+        t5_matcher.match(availible_drivers, passenger[0])
+        plot.append((curr_time, t5_matcher.d1, t5_matcher.d2))
 
     # Set the current time to the next unmatched passenger's log-in time
     curr_unmatched_passengers.append(unmatched_passengers.popleft())
@@ -50,10 +50,10 @@ while len(unmatched_passengers) > 0 and len(curr_unmatched_passengers) > 0:
     if len(unmatched_passengers) > 0:
         curr_time = unmatched_passengers[0][1]["time"]
 
-    print(len(unmatched_passengers), len(curr_unmatched_passengers))
+    print(len(unmatched_passengers), len(curr_unmatched_passengers), len(availible_drivers))
     end_time = time.time()
     execution_time = end_time - start_time
-    print("T3 total runtime:", execution_time)
+    print("5 total runtime:", execution_time)
 
 
 # Plotting
@@ -87,4 +87,5 @@ plt.suptitle('Line Plots with Datetime on X-axis')
 # Show the plot
 plt.show()
 
-# 105 seconds for first 200 samples
+# 34 seconds for first 200
+# 73.7 seconds for first 500

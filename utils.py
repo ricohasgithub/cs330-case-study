@@ -39,7 +39,7 @@ class BaseMatcher:
 
     # Override if neccesary; run through the simulation of picking up and dropping off a passenger
     # returns True/False for if the driver is returning for more rides
-    def complete_ride(self, driver, passenger, driver_node=None, passenger_node=None, heuristic="euclidean",):
+    def complete_ride(self, driver, passenger, driver_node=None, passenger_node=None, pickup_time=None, heuristic="euclidean"):
         
         if not driver_node and not passenger_node:
             start_time = time.time()
@@ -62,7 +62,8 @@ class BaseMatcher:
         start_time = time.time()
 
         # Calculate driving time for driver to reach passenger
-        pickup_time = self.map.get_time(driver_node, passenger_node, hour, heuristic=heuristic)
+        if not pickup_time:
+            pickup_time = self.map.get_time(driver_node, passenger_node, hour, heuristic=heuristic)
         # Time to get to pickup location is start time + time to drive to pickup location
         new_time = timedelta(hours=pickup_time) + max(self.drivers[driver]["time"], self.passengers[passenger]["time"])
 
@@ -109,7 +110,6 @@ class RoadNetwork:
     def __init__(self):
         # TODO: implement Floyd-Warshall to find shortest paths between all pairs of nodes
         self.graph, self.edge_data, self.speed_limit = read_adjacency("data/adjacency.json")
-        print(self.speed_limit)
         self.node_to_latlon = read_node_data("data/node_data.json")
 
     def get_neighbors(self, u):
@@ -152,11 +152,14 @@ class RoadNetwork:
                     dist[v] = dist[u] + self.get_edge_data(u, v, hour, "time")
                     if heuristic == "euclidean":
                         # Note that h is the euclidean distance, so we just call get_distance to t
-                        v_cost = dist[v] + ((self.get_distance(t, 
-                                                               self.node_to_latlon[v]["lat"],
-                                                               self.node_to_latlon[v]["lon"])) / self.speed_limit)
+                        v_cost = dist[v] + self.get_distance(t, 
+                                                             self.node_to_latlon[v]["lat"],
+                                                             self.node_to_latlon[v]["lon"])
                     elif heuristic == "djikstras":
                         v_cost = dist[v]
+                    elif heuristic == "manhattan":
+                        v_cost = dist[v] + abs(self.node_to_latlon[t]["lat"] -
+                                               self.node_to_latlon[v]["lat"]) + abs( self.node_to_latlon[t]["lon"] - self.node_to_latlon[v]["lon"])
                     heapq.heappush(pq, (v_cost, v))
         return dist[u]
 
