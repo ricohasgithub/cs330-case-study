@@ -266,8 +266,16 @@ class T4_Matcher(BaseMatcher):
             execution_time = end_time - start_time
             # print(f"PASSENGER CLOSEST Execution time: {execution_time} seconds")
 
+            passenger_lat, passenger_lon = self.passengers[passenger_id]["source_lat"], self.passengers[passenger_id]["source_lon"]
+
+            # Sort all drivers by euclidean distance to passgner
+            availible_drivers = sorted(availible_drivers, key=lambda x: self.get_euclidean_distance(
+                                       passenger_lat, passenger_lon,
+                                       self.drivers[x[1]]["source_lat"],
+                                       self.drivers[x[1]]["source_lon"]))
+
             execution_time = 0
-            for i in range(len(availible_drivers)):
+            for i in range(min(5, len(availible_drivers))):
                 start_time = time.time()
                 
                 driver = availible_drivers[i]

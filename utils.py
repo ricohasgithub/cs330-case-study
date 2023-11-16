@@ -86,8 +86,8 @@ class BaseMatcher:
         # Final arrival time - passenger login time
         self.d1 += ((new_time - self.passengers[passenger]["time"]).total_seconds() / 60)
         self.d2 += (driving_time - pickup_time) * 60
-        # print("D1: ", (new_time - self.passengers[passenger]["time"]).total_seconds() / 60)
-        # print("D2: ", (driving_time - pickup_time) * 60)
+        print("D1: ", (new_time - self.passengers[passenger]["time"]).total_seconds() / 60)
+        print("D2: ", (driving_time - pickup_time) * 60)
 
         # Increment the number of rides the driver has completed
         rides = self.drivers[driver]["rides"] - 1
@@ -159,8 +159,9 @@ class RoadNetwork:
                         v_cost = dist[v]
                     elif heuristic == "manhattan":
                         v_cost = dist[v] + abs(self.node_to_latlon[t]["lat"] -
-                                               self.node_to_latlon[v]["lat"]) + abs( self.node_to_latlon[t]["lon"] - self.node_to_latlon[v]["lon"])
+                                               self.node_to_latlon[v]["lat"]) + abs(self.node_to_latlon[t]["lon"] - self.node_to_latlon[v]["lon"])
                     heapq.heappush(pq, (v_cost, v))
+
         return dist[u]
 
 # Read and parse adjacency.json as an adjacency list
