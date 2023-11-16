@@ -39,18 +39,22 @@ class BaseMatcher:
 
     # Override if neccesary; run through the simulation of picking up and dropping off a passenger
     # returns True/False for if the driver is returning for more rides
-    def complete_ride(self, driver, passenger, heuristic="euclidean"):
+    def complete_ride(self, driver, passenger, driver_node=None, passenger_node=None, heuristic="euclidean",):
         
-        start_time = time.time()
+        if not driver_node and not passenger_node:
+            start_time = time.time()
 
         # Find closest nodes to each of driver and passenger
-        driver_node = self.get_closest_nodes(self.drivers[driver]["source_lat"], self.drivers[driver]["source_lon"]) if not driver in self.nearest_nodes.keys() else self.nearest_nodes[driver]
-        passenger_node = self.get_closest_nodes(self.passengers[passenger]["source_lat"], self.passengers[passenger]["source_lon"])
+        if not driver_node:
+            driver_node = self.get_closest_nodes(self.drivers[driver]["source_lat"], self.drivers[driver]["source_lon"]) if not driver in self.nearest_nodes.keys() else self.nearest_nodes[driver]
+        if not passenger_node:
+            passenger_node = self.get_closest_nodes(self.passengers[passenger]["source_lat"], self.passengers[passenger]["source_lon"])
         dest_node = self.get_closest_nodes(self.passengers[passenger]["dest_lat"], self.passengers[passenger]["dest_lon"])
         
-        end_time = time.time()
-        execution_time = end_time - start_time
-        print(f"CLOSEST Execution time: {execution_time} seconds")
+        if not driver_node and not passenger_node:
+            end_time = time.time()
+            execution_time = end_time - start_time
+            print(f"CLOSEST Execution time: {execution_time} seconds")
 
         # Calculate starting drive hour
         hour = max(self.drivers[driver]["time"].hour, self.passengers[passenger]["time"].hour)
@@ -73,7 +77,7 @@ class BaseMatcher:
 
         end_time = time.time()
         execution_time = end_time - start_time
-        print(f"A* Execution time: {execution_time} seconds")
+        # print(f"A* Execution time: {execution_time} seconds")
 
         # Calculate starting drive hour
         hour = max(self.drivers[driver]["time"].hour, self.passengers[passenger]["time"].hour)
@@ -81,13 +85,13 @@ class BaseMatcher:
         # Final arrival time - passenger login time
         self.d1 += ((new_time - self.passengers[passenger]["time"]).total_seconds() / 60)
         self.d2 += (driving_time - pickup_time) * 60
-        print("D1: ", (new_time - self.passengers[passenger]["time"]).total_seconds() / 60)
-        print("D2: ", (driving_time - pickup_time) * 60)
+        # print("D1: ", (new_time - self.passengers[passenger]["time"]).total_seconds() / 60)
+        # print("D2: ", (driving_time - pickup_time) * 60)
 
         # Increment the number of rides the driver has completed
         rides = self.drivers[driver]["rides"] - 1
         if rides <= 0:
-            print("DRIVER RETIRED")
+            # print("DRIVER RETIRED")
             return False
         else:
             # Update dictionary entry for driver time and position

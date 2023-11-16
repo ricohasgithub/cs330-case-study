@@ -145,7 +145,7 @@ class T3_Matcher(BaseMatcher):
 
                 end_time = time.time()
                 execution_time = end_time - start_time
-                print(f"DJIKSTRAS Execution time: {execution_time} seconds")
+                # print(f"DJIKSTRAS Execution time: {execution_time} seconds")
 
                 if (pickup_time < min_time):
                     min_time = pickup_time
@@ -153,13 +153,21 @@ class T3_Matcher(BaseMatcher):
 
             driver_id = availible_drivers[min_driver][1]
             del availible_drivers[min_driver]
+
+            start_time = time.time()
             driver_return_to_road = self.complete_ride(driver_id, passenger_id)
-            
+            end_time = time.time()
+            execution_time = end_time - start_time
+            print(f"complete_ride Execution time: {execution_time} seconds")
         else:
             driver_id = availible_drivers[0][1]
             del availible_drivers[0]
-            driver_return_to_road = self.complete_ride(driver_id, passenger_id)
 
+            start_time = time.time()
+            driver_return_to_road = self.complete_ride(driver_id, passenger_id)
+            end_time = time.time()
+            execution_time = end_time - start_time
+            print(f"complete_ride Execution time: {execution_time} seconds")
         if driver_return_to_road:
             heapq.heappush(self.drivers_pq, (self.drivers[driver_id]["time"],
                                             driver_id,
@@ -182,43 +190,66 @@ class T4_Matcher(BaseMatcher):
             # Insert time first so that heap sorts from min to max time
             heapq.heappush(self.drivers_pq, (data["time"], id,
                                              data["source_lat"], data["source_lon"]))
+        
         # Sort coordinates by x-coordinate
         self.sorted_coordinates = sorted(self.map.node_to_latlon.items(), key=lambda x: x[1]["lon"])
-        self.nodes = list(self.map.graph.keys())
-        self.sorted_nodes = sorted(self.nodes, key=lambda node: (node.lat, node.lon))
+        
+        # Assuming latlon dictionaries have 'lat' and 'lon' keys
+        self.sorted_nodes = sorted(
+            self.map.graph.items(),
+            key=lambda item: (self.map.node_to_latlon[item[0]]['lat'], self.map.node_to_latlon[item[0]]['lon'])
+        )
 
-    def get_closest_node_divide_and_conquer(self, lat, lon):
-        closest_node = self._closest_node_recursive(self.sorted_nodes, lat, lon)
-        return closest_node
 
-    def _closest_node_recursive(self, nodes, lat, lon):
-        if len(nodes) <= 3:
-            return min(nodes, key=lambda node: self.map.get_distance(node, lat, lon))
 
-        mid = len(nodes) // 2
-        mid_node = nodes[mid]
+        #     # Override if neccesary
+        # def get_closest_nodes(self, lat, lon):
+        #     # Linearly search through all vertices in self.map and see which one has the least distance 
+        #     min_distance, nearest = float("inf"), None
+        #     for node, neighbors in self.map.graph.items():
+        #         distance = self.map.get_distance(node, lat, lon)
+        #         if distance < min_distance:
+        #             min_distance = distance
+        #             nearest = node
+        #     return nearest
 
-        left_nodes = nodes[:mid]
-        right_nodes = nodes[mid:]
+    def euclidean_distance(self, lat1, lon1, lat2, lon2):
+        return math.sqrt((lat2 - lat1)**2 + (lon2 - lon1)**2)
 
-        left_closest = self._closest_node_recursive(left_nodes, lat, lon)
-        right_closest = self._closest_node_recursive(right_nodes, lat, lon)
+    def binary_get_closest_nodes(self, lat, lon):
+        low, high = 0, len(self.sorted_nodes) - 1
+        nearest = None
+        min_distance = float("inf")
 
-        closest_in_strip = self._closest_in_strip(nodes, mid_node, lat, lon, min(left_closest, right_closest))
+        while low <= high:
+            mid = (low + high) // 2
+            current_node, _ = self.sorted_nodes[mid]  # Extracting the node from the tuple
 
-        return min(left_closest, right_closest, closest_in_strip, key=lambda node: self.map.get_distance(node, lat, lon))
+            distance = self.map.get_distance(
+                current_node,
+                lat,
+                lon
+            )
 
-    def _closest_in_strip(self, nodes, mid_node, lat, lon, min_distance):
-        strip = [node for node in nodes if mid_node.lat - min_distance <= node.lat <= mid_node.lat + min_distance]
-        strip = sorted(strip, key=lambda node: node.lon)
+            if distance < min_distance:
+                min_distance = distance
+                nearest = current_node
 
-        for i in range(len(strip)):
-            for j in range(i+1, min(i+7, len(strip))):
-                distance = self.map.get_distance(strip[i], lat, lon)
-                if distance < min_distance:
-                    min_distance = distance
+            if lat < self.map.node_to_latlon[current_node]['lat'] or (
+                lat == self.map.node_to_latlon[current_node]['lat'] and lon < self.map.node_to_latlon[current_node]['lon']
+            ):
+                high = mid - 1
+            else:
+                low = mid + 1
 
-        return min_distance
+        return nearest
+
+
+
+
+
+
+
 
     
     # Get best driver for a given passenger by finding first availible driver
@@ -233,34 +264,32 @@ class T4_Matcher(BaseMatcher):
 
             start_time = time.time()
             # Find closest nodes to each of driver and passenger
-            passenger_node = self.get_closest_nodes(self.passengers[passenger_id]["source_lat"], self.passengers[passenger_id]["source_lon"])
+            passenger_node = self.binary_get_closest_nodes(self.passengers[passenger_id]["source_lat"], self.passengers[passenger_id]["source_lon"])
             end_time = time.time()
             execution_time = end_time - start_time
-            print(f"PASSNEGER CLOSEST Execution time: {execution_time} seconds")
+            print(f"PASSENGER CLOSEST Execution time: {execution_time} seconds")
 
             for i in range(len(availible_drivers)):
 
                 start_time = time.time()
-
                 driver = availible_drivers[i]
                 driver_id = driver[1]
-                driver_node = self.get_closest_nodes(self.drivers[driver_id]["source_lat"], self.drivers[driver_id]["source_lon"]) if not driver_id in self.nearest_nodes.keys() else self.nearest_nodes[driver_id]
+                driver_node = self.binary_get_closest_nodes(self.drivers[driver_id]["source_lat"], self.drivers[driver_id]["source_lon"]) if driver_id not in self.nearest_nodes.keys() else self.nearest_nodes[driver_id]
                 self.nearest_nodes[driver_id] = driver_node
-
                 end_time = time.time()
                 execution_time = end_time - start_time
-                print(f"CLOSEST Execution time: {execution_time} seconds")
+                print(f"DRIVER CLOSEST Execution time: {execution_time} seconds")
 
-                start_time = time.time()
+                # start_time = time.time()
 
                 # Calculate starting drive hour
                 hour = max(self.drivers[driver_id]["time"].hour, self.passengers[passenger_id]["time"].hour)
                 # Calculate driving time for driver to reach passenger
                 pickup_time = self.map.get_time(driver_node, passenger_node, hour)
 
-                end_time = time.time()
-                execution_time = end_time - start_time
-                print(f"A* Execution time: {execution_time} seconds")
+                # end_time = time.time()
+                # execution_time = end_time - start_time
+                # print(f"A* Execution time: {execution_time} seconds")
 
                 if (pickup_time < min_time):
                     min_time = pickup_time
@@ -268,12 +297,22 @@ class T4_Matcher(BaseMatcher):
 
             driver_id = availible_drivers[min_driver][1]
             del availible_drivers[min_driver]
+
+            start_time = time.time()
             driver_return_to_road = self.complete_ride(driver_id, passenger_id)
-                
+            end_time = time.time()
+            execution_time = end_time - start_time
+            print(f"complete_ride Execution time: {execution_time} seconds")
         else:
             driver_id = availible_drivers[0][1]
             del availible_drivers[0]
+
+            start_time = time.time()
             driver_return_to_road = self.complete_ride(driver_id, passenger_id)
+            end_time = time.time()
+            execution_time = end_time - start_time
+            print(f"complete_ride Execution time: {execution_time} seconds")
+
 
         if driver_return_to_road:
             heapq.heappush(self.drivers_pq, (self.drivers[driver_id]["time"],
