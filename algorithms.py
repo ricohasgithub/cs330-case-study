@@ -269,7 +269,7 @@ class T4_Matcher(BaseMatcher):
             passenger_lat, passenger_lon = self.passengers[passenger_id]["source_lat"], self.passengers[passenger_id]["source_lon"]
 
             # Sort all drivers by euclidean distance to passgner
-            availible_drivers = sorted(availible_drivers, key=lambda x: self.get_euclidean_distance(
+            availible_drivers.sort(key=lambda x: self.get_euclidean_distance(
                                        passenger_lat, passenger_lon,
                                        self.drivers[x[1]]["source_lat"],
                                        self.drivers[x[1]]["source_lon"]))

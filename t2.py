@@ -50,7 +50,7 @@ while len(unmatched_passengers) > 0 and len(curr_unmatched_passengers) > 0:
     if len(unmatched_passengers) > 0:
         curr_time = unmatched_passengers[0][1]["time"]
 
-    print(len(unmatched_passengers), len(curr_unmatched_passengers))
+    print(len(unmatched_passengers), len(curr_unmatched_passengers), len(availible_drivers))
 
     end_time = time.time()
     execution_time = end_time - start_time
