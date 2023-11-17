@@ -4,6 +4,7 @@ import math
 import time
 import random
 import multiprocessing
+from kd_tree import KDTree, Node  
 
 from utils import *
 
@@ -345,59 +346,67 @@ class T5_Matcher(BaseMatcher):
             heapq.heappush(self.drivers_pq, (data["time"], id,
                                              data["source_lat"], data["source_lon"]))
         
-        # Sort coordinates by x-coordinate
-        self.sorted_coordinates = sorted(self.map.node_to_latlon.items(), key=lambda x: x[1]["lon"])
-        
-        # Assuming latlon dictionaries have 'lat' and 'lon' keys
-        self.sorted_nodes = sorted(
-            self.map.graph.items(),
-            key=lambda item: (self.map.node_to_latlon[item[0]]['lat'], self.map.node_to_latlon[item[0]]['lon'])
-        )
+        node_coordinates = [(self.map.node_to_latlon[node]['lat'], self.map.node_to_latlon[node]['lon']) for node, _ in self.sorted_nodes]
 
-    def get_euclidean_distance(self, lat1, lon1, lat2, lon2):
-        return math.sqrt((lat2 - lat1)**2 + (lon2 - lon1)**2)
+        self.kd_tree = KDTree(node_coordinates)
 
     def get_closest_nodes(self, lat, lon):
-        low, high = 0, len(self.sorted_nodes) - 1
-        nearest = None
-        min_distance = float("inf")
+        nearest_point = self.kd_tree.closest_point((lat, lon))
+        return nearest_point.point if nearest_point else None
 
-        while low <= high:
-            mid = (low + high) // 2
-            current_node, _ = self.sorted_nodes[mid]  # Extracting the node from the tuple
+        # # Sort coordinates by x-coordinate
+        # self.sorted_coordinates = sorted(self.map.node_to_latlon.items(), key=lambda x: x[1]["lon"])
+        
+        # # Assuming latlon dictionaries have 'lat' and 'lon' keys
+        # self.sorted_nodes = sorted(
+        #     self.map.graph.items(),
+        #     key=lambda item: (self.map.node_to_latlon[item[0]]['lat'], self.map.node_to_latlon[item[0]]['lon'])
+        # )
 
-            distance = self.map.get_distance(
-                current_node,
-                lat,
-                lon
-            )
+    # def get_euclidean_distance(self, lat1, lon1, lat2, lon2):
+    #     return math.sqrt((lat2 - lat1)**2 + (lon2 - lon1)**2)
 
-            if distance < min_distance:
-                min_distance = distance
-                nearest = current_node
+    # def get_closest_nodes(self, lat, lon):
+    #     low, high = 0, len(self.sorted_nodes) - 1
+    #     nearest = None
+    #     min_distance = float("inf")
 
-            if lat < self.map.node_to_latlon[current_node]['lat'] or (
-                lat == self.map.node_to_latlon[current_node]['lat'] and lon < self.map.node_to_latlon[current_node]['lon']
-            ):
-                high = mid - 1
-            else:
-                low = mid + 1
+    #     while low <= high:
+    #         mid = (low + high) // 2
+    #         current_node, _ = self.sorted_nodes[mid]  # Extracting the node from the tuple
 
-        # Find a 100-neighbor radius for to find a local optima
-        lower_bound = max(0, mid - 50)
-        upper_bound = min(len(self.sorted_nodes), mid + 50)
-        lon_nearest = nearest
+    #         distance = self.map.get_distance(
+    #             current_node,
+    #             lat,
+    #             lon
+    #         )
 
-        for i in range(lower_bound, upper_bound):
-            current_node, _ = self.sorted_nodes[i]
-            c_dist = self.get_euclidean_distance(lat, lon,
-                                            self.map.node_to_latlon[current_node]["lat"],
-                                            self.map.node_to_latlon[current_node]["lon"])
-            if c_dist < min_distance:
-                min_distance = c_dist
-                lon_nearest = current_node
+    #         if distance < min_distance:
+    #             min_distance = distance
+    #             nearest = current_node
 
-        return lon_nearest
+    #         if lat < self.map.node_to_latlon[current_node]['lat'] or (
+    #             lat == self.map.node_to_latlon[current_node]['lat'] and lon < self.map.node_to_latlon[current_node]['lon']
+    #         ):
+    #             high = mid - 1
+    #         else:
+    #             low = mid + 1
+
+    #     # Find a 100-neighbor radius for to find a local optima
+    #     lower_bound = max(0, mid - 50)
+    #     upper_bound = min(len(self.sorted_nodes), mid + 50)
+    #     lon_nearest = nearest
+
+    #     for i in range(lower_bound, upper_bound):
+    #         current_node, _ = self.sorted_nodes[i]
+    #         c_dist = self.get_euclidean_distance(lat, lon,
+    #                                         self.map.node_to_latlon[current_node]["lat"],
+    #                                         self.map.node_to_latlon[current_node]["lon"])
+    #         if c_dist < min_distance:
+    #             min_distance = c_dist
+    #             lon_nearest = current_node
+
+    #     return lon_nearest
 
     # Get best driver for a given passenger by finding first availible driver
     def match(self, availible_drivers, passenger_id):
