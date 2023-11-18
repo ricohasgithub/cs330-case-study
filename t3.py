@@ -54,6 +54,8 @@ while len(unmatched_passengers) > 0 and len(curr_unmatched_passengers) > 0:
     end_time = time.time()
     execution_time = end_time - start_time
     print("T3 total runtime:", execution_time)
+    print("Total D1:", t3_matcher.d1)
+    print("Total D2:", t3_matcher.d2)
 
 
 # Plotting

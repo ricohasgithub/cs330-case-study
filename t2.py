@@ -55,6 +55,8 @@ while len(unmatched_passengers) > 0 and len(curr_unmatched_passengers) > 0:
     end_time = time.time()
     execution_time = end_time - start_time
     print("T2 total runtime:", execution_time)
+    print("Total D1:", t2_matcher.d1)
+    print("Total D2:", t2_matcher.d2)
 
 # Plotting
 fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(10, 8))

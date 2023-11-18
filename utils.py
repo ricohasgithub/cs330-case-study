@@ -21,6 +21,7 @@ class BaseMatcher:
         # Metrics to measure performance in alignment with desiderata
         self.d1 = 0
         self.d2 = 0
+        self.past_times = dict()
 
     def update_driver(self, id, time, rides, lat, lon):
         self.drivers[id] = {"time": time, "rides": rides,
@@ -57,18 +58,28 @@ class BaseMatcher:
             print(f"CLOSEST Execution time: {execution_time} seconds")
 
         # Calculate starting drive hour
-        hour = max(self.drivers[driver]["time"].hour, self.passengers[passenger]["time"].hour)
+        if self.drivers[driver]["time"].day < self.passengers[passenger]["time"].day:
+            hour = self.passengers[passenger]["time"].hour
+        elif self.drivers[driver]["time"].day > self.passengers[passenger]["time"].day:
+            hour = self.drivers[driver]["time"].hour
+        else:
+            hour = max(self.drivers[driver]["time"].hour, self.passengers[passenger]["time"].hour)
 
         start_time = time.time()
 
         # Calculate driving time for driver to reach passenger
         if not pickup_time:
             pickup_time = self.map.get_time(driver_node, passenger_node, hour, heuristic=heuristic)
+            if (driver_node, passenger_node) not in self.past_times:
+                self.past_times[(driver_node, passenger_node)] = pickup_time
         # Time to get to pickup location is start time + time to drive to pickup location
+        print(driver, passenger, pickup_time)
         new_time = timedelta(hours=pickup_time) + max(self.drivers[driver]["time"], self.passengers[passenger]["time"])
 
         # Calculate driving time from passenger to their destination
         driving_time = self.map.get_time(passenger_node, dest_node, hour, heuristic=heuristic)
+        if (passenger_node, dest_node) not in self.past_times:
+                self.past_times[(passenger_node, dest_node)] = driving_time
         # Start time at pickup location + time to drive to arrival location
         # So this is just dropoff time
         new_time = timedelta(hours=driving_time) + new_time
@@ -79,9 +90,6 @@ class BaseMatcher:
         end_time = time.time()
         execution_time = end_time - start_time
         # print(f"A* Execution time: {execution_time} seconds")
-
-        # Calculate starting drive hour
-        hour = max(self.drivers[driver]["time"].hour, self.passengers[passenger]["time"].hour)
 
         # Final arrival time - passenger login time
         self.d1 += ((new_time - self.passengers[passenger]["time"]).total_seconds() / 60)
@@ -135,34 +143,32 @@ class RoadNetwork:
     def get_time(self, s, t, hour, heuristic="euclidean"):
         # We model the road network as a weighted graph where the edge weights are travel times
         # return the minimum shortest path for minimum time to go from s to t
-        pq, dist = [(0, s)], dict()
-        for node, _ in self.node_to_latlon.items():
-            dist[node] = float("inf")
+        pq, dist = [(0, s)], defaultdict(lambda: float("inf"))
         dist[s] = 0
 
-        while len(pq) > 0:
+        while pq:
             cost, u = heapq.heappop(pq)
             if u == t:
                 return dist[u]
             # Add all neighbors to the search queue
             for v in self.graph[u]:
+                new_dist = dist[u] + self.get_edge_data(u, v, hour, "time")
                 # We can still relax this edge
-                if dist[v] > dist[u] + self.get_edge_data(u, v, hour, "time"):
-                    # dist[v] = dist[u] + w(u -> v)
-                    dist[v] = dist[u] + self.get_edge_data(u, v, hour, "time")
+                if dist[v] > new_dist:
+                    dist[v] = new_dist
                     if heuristic == "euclidean":
                         # Note that h is the euclidean distance, so we just call get_distance to t
                         v_cost = dist[v] + self.get_distance(t, 
-                                                             self.node_to_latlon[v]["lat"],
-                                                             self.node_to_latlon[v]["lon"])
+                                                            self.node_to_latlon[v]["lat"],
+                                                            self.node_to_latlon[v]["lon"])
                     elif heuristic == "djikstras":
                         v_cost = dist[v]
                     elif heuristic == "manhattan":
                         v_cost = dist[v] + abs(self.node_to_latlon[t]["lat"] -
-                                               self.node_to_latlon[v]["lat"]) + abs(self.node_to_latlon[t]["lon"] - self.node_to_latlon[v]["lon"])
+                                            self.node_to_latlon[v]["lat"]) + abs(self.node_to_latlon[t]["lon"] - self.node_to_latlon[v]["lon"])
                     heapq.heappush(pq, (v_cost, v))
 
-        return dist[u]
+        return dist[t]
 
 # Read and parse adjacency.json as an adjacency list
 def read_adjacency(path):
@@ -206,8 +212,8 @@ def read_drivers(path):
                 date_time = datetime.strptime(data[0], "%m/%d/%Y %H:%M:%S")
                 source_lat = float(data[1])
                 source_lon = float(data[2])
-                # Compute a random driver capacity from around 10-20 rides
-                drivers[index] = {"time": date_time, "rides": random.randint(10, 20),
+                # Compute a random driver capacity from around 10-12 rides
+                drivers[index] = {"time": date_time, "rides": random.randint(10, 12),
                                   "source_lat": source_lat, "source_lon": source_lon}
                 index += 1
     return drivers
