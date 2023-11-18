@@ -609,16 +609,19 @@ class B4_Matcher(BaseMatcher):
 
         # Calculate driving time for driver to reach passenger
         if not pickup_time:
-            pickup_time = self.map.get_time(driver_node, passenger_node, hour, heuristic=heuristic)
-            if (driver_node, passenger_node) not in self.past_times:
-                self.past_times[(driver_node, passenger_node)] = pickup_time
+            pickup_time = self.past_times[(driver_node, passenger_node)]
+            # pickup_time = self.map.get_time(driver_node, passenger_node, hour, heuristic=heuristic)
+            # if (driver_node, passenger_node) not in self.past_times:
+            #     self.past_times[(driver_node, passenger_node)] = pickup_time
         # Time to get to pickup location is start time + time to drive to pickup location
         new_time = timedelta(hours=pickup_time) + max(self.drivers[driver]["time"], self.passengers[passenger]["time"])
 
         # Calculate driving time from passenger to their destination
-        driving_time = self.map.get_time(passenger_node, dest_node, hour, heuristic=heuristic)
-        if (passenger_node, dest_node) not in self.past_times:
-                self.past_times[(passenger_node, dest_node)] = driving_time
+        driving_time = self.past_times[(passenger_node, dest_node)]
+        # driving_time = self.map.get_time(passenger_node, dest_node, hour, heuristic=heuristic)
+        # if (passenger_node, dest_node) not in self.past_times:
+        #         self.past_times[(passenger_node, dest_node)] = driving_time
+        
         # Start time at pickup location + time to drive to arrival location
         # So this is just dropoff time
         new_time = timedelta(hours=driving_time) + new_time

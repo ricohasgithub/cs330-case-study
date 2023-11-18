@@ -18,12 +18,12 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
 # Contains driver states for simulation
-t4_matcher = T4_Matcher()
+b4_matcher = B4_Matcher()
 
 # Priority queue of availible drivers
 availible_drivers = []
 # List of all unmatched passengers by increasing time
-unmatched_passengers = deque([[id, data] for id, data in t4_matcher.passengers.items()])
+unmatched_passengers = deque([[id, data] for id, data in b4_matcher.passengers.items()])
 # Unmatched at current time
 curr_unmatched_passengers = deque([unmatched_passengers.popleft()])
 # Time of simulation start is the time of the first passenger, since it is sorted by time increasing
@@ -38,8 +38,8 @@ while len(unmatched_passengers) > 0 and len(curr_unmatched_passengers) > 0:
     
     # Check to see if any new drivers have logged on
     # Add all drivers availible at current time to the availible drivers priority queue (sorted by increasing time)
-    while t4_matcher.drivers_pq[0][0] <= curr_time:
-        data = heapq.heappop(t4_matcher.drivers_pq)
+    while b4_matcher.drivers_pq[0][0] <= curr_time:
+        data = heapq.heappop(b4_matcher.drivers_pq)
         availible_drivers.append((data[0], data[1], data[2], data[3]))
 
     # Match all availible drivers to customers
@@ -47,8 +47,8 @@ while len(unmatched_passengers) > 0 and len(curr_unmatched_passengers) > 0:
         # Since curr_unmatched_passengers is sorted increasing by time
         # this will be the longest waiting passenger
         passenger = curr_unmatched_passengers.popleft()
-        t4_matcher.match(availible_drivers, passenger[0])
-        plot.append((curr_time, t4_matcher.d1, t4_matcher.d2))
+        b4_matcher.match(availible_drivers, passenger[0])
+        plot.append((curr_time, b4_matcher.d1, b4_matcher.d2))
 
     # Set the current time to the next unmatched passenger's log-in time
     curr_unmatched_passengers.append(unmatched_passengers.popleft())
@@ -60,8 +60,8 @@ while len(unmatched_passengers) > 0 and len(curr_unmatched_passengers) > 0:
     end_time = time.time()
     execution_time = end_time - start_time
     print("T4 total runtime:", execution_time)
-    print("Total D1:", t4_matcher.d1)
-    print("Total D2:", t4_matcher.d2)
+    print("Total D1:", b4_matcher.d1)
+    print("Total D2:", b4_matcher.d2)
 
 
 # Plotting
