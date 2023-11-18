@@ -6,7 +6,6 @@ class Node:
         self.left = left    # Left child
         self.right = right  # Right child
 
-
 def build_kd_tree(points, depth=0):
     n = len(points)
     if n == 0:
@@ -20,9 +19,7 @@ def build_kd_tree(points, depth=0):
     node = Node(sorted_points[median_index][0], sorted_points[median_index][1])
     node.left = build_kd_tree(sorted_points[:median_index], depth + 1)
     node.right = build_kd_tree(sorted_points[median_index + 1:], depth + 1)
-
     return node
-
 
 def find_nearest(node, point, depth=0, best=None):
     if node is None:
