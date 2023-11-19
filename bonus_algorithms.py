@@ -179,7 +179,7 @@ class B1_Matcher(BaseMatcher):
                                        self.drivers[x[1]]["source_lon"]))
 
             execution_time = 0
-            for i in range(min(10, len(availible_drivers))):
+            for i in range(min(5, len(availible_drivers))):
                 start_time = time.time()
                 
                 driver = availible_drivers[i]
@@ -193,7 +193,12 @@ class B1_Matcher(BaseMatcher):
                 # print(f"DRIVER CLOSEST Execution time: {execution_time} seconds")
 
                 # Calculate starting drive hour
-                hour = max(self.drivers[driver_id]["time"].hour, self.passengers[passenger_id]["time"].hour)
+                if self.drivers[driver_id]["time"].day < self.passengers[passenger_id]["time"].day:
+                    hour = self.passengers[passenger_id]["time"].hour
+                elif self.drivers[driver_id]["time"].day > self.passengers[passenger_id]["time"].day:
+                    hour = self.drivers[driver_id]["time"].hour
+                else:
+                    hour = max(self.drivers[driver_id]["time"].hour, self.passengers[passenger_id]["time"].hour)
                 # Calculate driving time for driver to reach passenger
                 pickup_time = self.map.get_time(driver_node, passenger_node, hour)
 
@@ -334,7 +339,7 @@ class B2_Matcher(BaseMatcher):
                                        self.drivers[x[1]]["source_lon"]))
 
             execution_time = 0
-            for i in range(min(5, len(availible_drivers))):
+            for i in range(min(10, len(availible_drivers))):
                 start_time = time.time()
                 
                 driver = availible_drivers[i]
@@ -348,7 +353,12 @@ class B2_Matcher(BaseMatcher):
                 # print(f"DRIVER CLOSEST Execution time: {execution_time} seconds")
 
                 # Calculate starting drive hour
-                hour = max(self.drivers[driver_id]["time"].hour, self.passengers[passenger_id]["time"].hour)
+                if self.drivers[driver_id]["time"].day < self.passengers[passenger_id]["time"].day:
+                    hour = self.passengers[passenger_id]["time"].hour
+                elif self.drivers[driver_id]["time"].day > self.passengers[passenger_id]["time"].day:
+                    hour = self.drivers[driver_id]["time"].hour
+                else:
+                    hour = max(self.drivers[driver_id]["time"].hour, self.passengers[passenger_id]["time"].hour)
                 # Calculate driving time for driver to reach passenger
                 pickup_time = self.map.get_time(driver_node, passenger_node, hour)
                 pickup_time = (1 + (self.numDriverRides.get(driver_id, 0) * 0.1)) * pickup_time
@@ -503,7 +513,12 @@ class B2_Default_Matcher(BaseMatcher):
                 # print(f"DRIVER CLOSEST Execution time: {execution_time} seconds")
 
                 # Calculate starting drive hour
-                hour = max(self.drivers[driver_id]["time"].hour, self.passengers[passenger_id]["time"].hour)
+                if self.drivers[driver_id]["time"].day < self.passengers[passenger_id]["time"].day:
+                    hour = self.passengers[passenger_id]["time"].hour
+                elif self.drivers[driver_id]["time"].day > self.passengers[passenger_id]["time"].day:
+                    hour = self.drivers[driver_id]["time"].hour
+                else:
+                    hour = max(self.drivers[driver_id]["time"].hour, self.passengers[passenger_id]["time"].hour)
                 # Calculate driving time for driver to reach passenger
                 pickup_time = self.map.get_time(driver_node, passenger_node, hour)
 
@@ -657,7 +672,12 @@ class B3_Matcher(BaseMatcher):
                 # print(f"DRIVER CLOSEST Execution time: {execution_time} seconds")
 
                 # Calculate starting drive hour
-                hour = max(self.drivers[driver_id]["time"].hour, self.passengers[passenger_id]["time"].hour)
+                if self.drivers[driver_id]["time"].day < self.passengers[passenger_id]["time"].day:
+                    hour = self.passengers[passenger_id]["time"].hour
+                elif self.drivers[driver_id]["time"].day > self.passengers[passenger_id]["time"].day:
+                    hour = self.drivers[driver_id]["time"].hour
+                else:
+                    hour = max(self.drivers[driver_id]["time"].hour, self.passengers[passenger_id]["time"].hour)
                 # Calculate driving time for driver to reach passenger
                 pickup_time, path = self.map.get_time_with_traffic(driver_node, passenger_node, hour)
                 print(path)

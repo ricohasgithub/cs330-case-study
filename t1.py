@@ -60,7 +60,7 @@ while len(unmatched_passengers) > 0 and len(curr_unmatched_passengers) > 0:
     print("T1 total runtime:", execution_time)
 
 # Print a summary of the experiments for D1, D2, D3
-T1_Matcher.summarize_experiments()
+t1_matcher.summarize_experiments()
 
 # Plotting
 fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(10, 8))
