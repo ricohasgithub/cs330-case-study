@@ -1,10 +1,4 @@
-# Optimize using historical data.
-
-# We can track the most popular routes and precompute the best routes for drivers to take.
-
-# We can track the most popular area for drivers to be in and precompute the best areas for drivers to be in.
-
-
+import json
 import heapq
 from collections import deque
 
@@ -17,8 +11,12 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
+
 # Contains driver states for simulation
 b4_matcher = B4_Matcher()
+
+with open('past_times.json', 'r') as f:
+  b4_matcher.past_times = json.load(f)
 
 # Priority queue of availible drivers
 availible_drivers = []
@@ -59,7 +57,7 @@ while len(unmatched_passengers) > 0 and len(curr_unmatched_passengers) > 0:
     print(len(unmatched_passengers), len(curr_unmatched_passengers), len(availible_drivers))
     end_time = time.time()
     execution_time = end_time - start_time
-    print("T4 total runtime:", execution_time)
+    print("5 total runtime:", execution_time)
     print("Total D1:", b4_matcher.d1)
     print("Total D2:", b4_matcher.d2)
 
@@ -95,5 +93,5 @@ plt.suptitle('Line Plots with Datetime on X-axis')
 # Show the plot
 plt.show()
 
-# 42 seconds for first 200
-# 80.7 seconds for first 500
+# 34 seconds for first 200
+# 73.7 seconds for first 500

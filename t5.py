@@ -1,4 +1,4 @@
-
+import json 
 import heapq
 from collections import deque
 
@@ -58,6 +58,8 @@ while len(unmatched_passengers) > 0 and len(curr_unmatched_passengers) > 0:
     print("Total D2:", t5_matcher.d2)
 
 
+with open("past_times.json", "w") as outfile: 
+    json.dump(t5_matcher.past_times, outfile)
 # Plotting
 fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(10, 8))
 

@@ -21,6 +21,12 @@ class BaseMatcher:
         # Metrics to measure performance in alignment with desiderata
         self.d1 = 0
         self.d2 = 0
+        self.total_rides_completed = 0
+        # Record total/cumulative times spent performing different parts of the algorithm
+        self.get_closest_total_time = 0
+        self.get_shortest_path_total_time = 0
+        self.get_closest_total_calls = 0
+        self.get_shortest_path_total_calls = 0
         self.past_times = dict()
 
     def update_driver(self, id, time, rides, lat, lon):
@@ -29,6 +35,10 @@ class BaseMatcher:
     
     # Override if neccesary
     def get_closest_nodes(self, lat, lon):
+
+        # Start timing current procedure
+        start_time = time.time()
+
         # Linearly search through all vertices in self.map and see which one has the least distance 
         min_distance, nearest = float("inf"), None
         for node, neighbors in self.map.graph.items():
@@ -36,6 +46,12 @@ class BaseMatcher:
             if distance < min_distance:
                 min_distance = distance
                 nearest = node
+        
+        # Compute total time spent finding nearest node
+        end_time = time.time()
+        self.get_closest_total_time += (end_time - start_time)
+        self.get_closest_total_calls += 1
+
         return nearest
 
     # Override if neccesary; run through the simulation of picking up and dropping off a passenger
@@ -57,7 +73,9 @@ class BaseMatcher:
             execution_time = end_time - start_time
             print(f"CLOSEST Execution time: {execution_time} seconds")
 
-        # Calculate starting drive hour
+        # Calculate starting drive hour; note that we check for the day in the case which
+        # a driver logs in at 23h the night before, and the passenger is requesting a ride
+        # the day after at an early time, (say at 0h or 1h)
         if self.drivers[driver]["time"].day < self.passengers[passenger]["time"].day:
             hour = self.passengers[passenger]["time"].hour
         elif self.drivers[driver]["time"].day > self.passengers[passenger]["time"].day:
@@ -65,21 +83,31 @@ class BaseMatcher:
         else:
             hour = max(self.drivers[driver]["time"].hour, self.passengers[passenger]["time"].hour)
 
-        start_time = time.time()
-
         # Calculate driving time for driver to reach passenger
         if not pickup_time:
+            start_time = time.time()
             pickup_time = self.map.get_time(driver_node, passenger_node, hour, heuristic=heuristic)
+            end_time = time.time()
+            self.get_shortest_path_total_time += (end_time - start_time)
+            self.get_shortest_path_total_calls += 1
+            # Cache results
             if (driver_node, passenger_node) not in self.past_times:
                 self.past_times[(driver_node, passenger_node)] = pickup_time
+        
         # Time to get to pickup location is start time + time to drive to pickup location
-        print(driver, passenger, pickup_time)
         new_time = timedelta(hours=pickup_time) + max(self.drivers[driver]["time"], self.passengers[passenger]["time"])
 
         # Calculate driving time from passenger to their destination
+        start_time = time.time()
         driving_time = self.map.get_time(passenger_node, dest_node, hour, heuristic=heuristic)
+
+        end_time = time.time()
+        self.get_shortest_path_total_time += (end_time - start_time)
+        self.get_shortest_path_total_calls += 1
+
         if (passenger_node, dest_node) not in self.past_times:
-                self.past_times[(passenger_node, dest_node)] = driving_time
+            self.past_times[(passenger_node, dest_node)] = driving_time
+        
         # Start time at pickup location + time to drive to arrival location
         # So this is just dropoff time
         new_time = timedelta(hours=driving_time) + new_time
@@ -87,20 +115,18 @@ class BaseMatcher:
         # Update the closest node to the driver to the passenger's destination node
         self.nearest_nodes[driver] = dest_node
 
-        end_time = time.time()
-        execution_time = end_time - start_time
-        # print(f"A* Execution time: {execution_time} seconds")
-
         # Final arrival time - passenger login time
         self.d1 += ((new_time - self.passengers[passenger]["time"]).total_seconds() / 60)
         self.d2 += (driving_time - pickup_time) * 60
         print("D1: ", (new_time - self.passengers[passenger]["time"]).total_seconds() / 60)
         print("D2: ", (driving_time - pickup_time) * 60)
 
-        # Increment the number of rides the driver has completed
+        # Decrement the number of rides the driver has left before they are too exhausted
         rides = self.drivers[driver]["rides"] - 1
+        self.total_rides_completed += 1
+
         if rides <= 0:
-            # print("DRIVER RETIRED")
+            # The driver has expended their "driver capacity", retire them
             return False
         else:
             # Update dictionary entry for driver time and position
@@ -112,13 +138,31 @@ class BaseMatcher:
     # with that passenger given some metric
     def match(self, availible_drivers, passenger_id):
         raise Exception("Not implemented")
+    
+    def summarize_experiments(self):
+
+        print("---------D1------------")
+        print("Cumulative D1:", self.d1)
+        print("Average D1:", self.d1 / self.total_rides_completed)
+
+        print("---------D2------------")
+        print("Cumulative D2:", self.d2)
+        print("Average D2:", self.d2 / self.total_rides_completed)
+
+        print("---------D3------------")
+        print("Total time spent finding closest nodes:", self.get_closest_total_time)
+        print("Average time spent finding closest nodes:", self.get_closest_total_time / self.get_closest_total_calls)
+        print("Total time spent finding shortest paths:", self.get_shortest_path_total_time)
+        print("Average time spent finding shortest paths:", self.get_shortest_path_total_time / self.get_shortest_path_total_calls)
 
 class RoadNetwork:
 
     def __init__(self):
-        # TODO: implement Floyd-Warshall to find shortest paths between all pairs of nodes
         self.graph, self.edge_data, self.speed_limit = read_adjacency("data/adjacency.json")
         self.node_to_latlon = read_node_data("data/node_data.json")
+        
+        # Used Only For B3
+        self.traffic = {}
 
     def get_neighbors(self, u):
         return self.graph[u]
@@ -169,6 +213,52 @@ class RoadNetwork:
                     heapq.heappush(pq, (v_cost, v))
 
         return dist[t]
+
+    # This method computes the shortest time needed for the driver to reach including traffic.
+    # a passenger at some (lat, lon) coord. Default implementation is A* with a euclidean heuristic
+    def get_time_with_traffic(self, s, t, hour, heuristic="euclidean"):
+        # We model the road network as a weighted graph where the edge weights are travel times
+        # return the minimum shortest path for minimum time to go from s to t
+        pq, dist, prev = [(0, s)], defaultdict(lambda: float("inf")), {}
+        dist[s] = 0
+        prev[s] = None
+
+        while pq:
+            cost, u = heapq.heappop(pq)
+            if u == t:
+                break  # Stop when the target is reached
+            # Add all neighbors to the search queue
+            for v in self.graph[u]:
+                curr_path = self.get_edge_data(u, v, hour, "time")
+                if (u, v) in self.traffic:
+                    curr_path *= self.traffic[(u, v)]
+                new_dist = dist[u] + curr_path
+                # We can still relax this edge
+                if dist[v] > new_dist:
+                    dist[v] = new_dist
+                    prev[v] = u  # Store the predecessor
+                    if heuristic == "euclidean":
+                        # Note that h is the euclidean distance
+                        v_cost = dist[v] + self.get_distance(t, 
+                                                            self.node_to_latlon[v]["lat"],
+                                                            self.node_to_latlon[v]["lon"])
+                    elif heuristic == "djikstras":
+                        v_cost = dist[v]
+                    elif heuristic == "manhattan":
+                        v_cost = dist[v] + abs(self.node_to_latlon[t]["lat"] -
+                                            self.node_to_latlon[v]["lat"]) + abs(self.node_to_latlon[t]["lon"] - self.node_to_latlon[v]["lon"])
+                    heapq.heappush(pq, (v_cost, v))
+
+        path = []
+        u = t
+        while prev[u] is not None:
+            path.append((prev[u], u))
+            u = prev[u]
+
+        for u, v in path:
+            self.traffic[(u, v)] = self.traffic.get((u, v), 0) + 1
+
+        return dist[t], path  # Return the distance and the path
 
 # Read and parse adjacency.json as an adjacency list
 def read_adjacency(path):
