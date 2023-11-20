@@ -12,11 +12,24 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
 
+# Read the existing JSON file
+with open('past_times.json', 'r') as json_file:
+    json_data = json.load(json_file)
+
+# Convert string keys back to tuples, omitting the last element
+converted_data = {tuple(key.strip("()").replace("'", "").split(", ")[:-1]): value for key, value in json_data.items()}
+
+# Print the converted data (optional)
+# print(converted_data)
+
+# Print the converted data (optional)
+# print(converted_data)
+
 # Contains driver states for simulation
 b4_matcher = B4_Matcher()
-
-with open('past_times.json', 'r') as f:
-  b4_matcher.past_times = json.load(f)
+b4_matcher.past_times = converted_data
+b4_matcher.match_counter = 0
+# print(b4_matcher.past_times)
 
 # Priority queue of availible drivers
 availible_drivers = []
@@ -57,10 +70,13 @@ while len(unmatched_passengers) > 0 and len(curr_unmatched_passengers) > 0:
     print(len(unmatched_passengers), len(curr_unmatched_passengers), len(availible_drivers))
     end_time = time.time()
     execution_time = end_time - start_time
-    print("5 total runtime:", execution_time)
+    print("B4 total runtime:", execution_time)
     print("Total D1:", b4_matcher.d1)
     print("Total D2:", b4_matcher.d2)
+    print("Total matches:", b4_matcher.match_counter)
 
+
+b4_matcher.summarize_experiments()
 
 # Plotting
 fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(10, 8))

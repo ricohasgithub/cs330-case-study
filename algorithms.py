@@ -137,7 +137,7 @@ class T3_Matcher(BaseMatcher):
                     hour = max(self.drivers[driver_id]["time"].hour, self.passengers[passenger_id]["time"].hour)
                 
                 start_time = time.time()
-                pickup_time = self.map.get_time(driver_node, passenger_node, hour)
+                pickup_time = self.map.get_time(driver_node, passenger_node, hour, heuristic="djikstras")
                 end_time = time.time()
                 self.get_shortest_path_total_time += (end_time - start_time)
                 self.get_shortest_path_total_calls += 1

@@ -87,9 +87,6 @@ class B1_Matcher(BaseMatcher):
     # overrides
     def complete_ride(self, driver, passenger, driver_node=None, passenger_node=None, pickup_time=None, heuristic="euclidean"):
         
-        if not driver_node and not passenger_node:
-            start_time = time.time()
-
         # Find closest nodes to each of driver and passenger
         if not driver_node:
             driver_node = self.get_closest_nodes(self.drivers[driver]["source_lat"], self.drivers[driver]["source_lon"]) if not driver in self.nearest_nodes.keys() else self.nearest_nodes[driver]
@@ -97,12 +94,9 @@ class B1_Matcher(BaseMatcher):
             passenger_node = self.get_closest_nodes(self.passengers[passenger]["source_lat"], self.passengers[passenger]["source_lon"])
         dest_node = self.get_closest_nodes(self.passengers[passenger]["dest_lat"], self.passengers[passenger]["dest_lon"])
         
-        if not driver_node and not passenger_node:
-            end_time = time.time()
-            execution_time = end_time - start_time
-            print(f"CLOSEST Execution time: {execution_time} seconds")
-
-        # Calculate starting drive hour
+        # Calculate starting drive hour; note that we check for the day in the case which
+        # a driver logs in at 23h the night before, and the passenger is requesting a ride
+        # the day after at an early time, (say at 0h or 1h)
         if self.drivers[driver]["time"].day < self.passengers[passenger]["time"].day:
             hour = self.passengers[passenger]["time"].hour
         elif self.drivers[driver]["time"].day > self.passengers[passenger]["time"].day:
@@ -110,16 +104,31 @@ class B1_Matcher(BaseMatcher):
         else:
             hour = max(self.drivers[driver]["time"].hour, self.passengers[passenger]["time"].hour)
 
-        start_time = time.time()
-
         # Calculate driving time for driver to reach passenger
         if not pickup_time:
+            start_time = time.time()
             pickup_time = self.map.get_time(driver_node, passenger_node, hour, heuristic=heuristic)
+            end_time = time.time()
+            self.get_shortest_path_total_time += (end_time - start_time)
+            self.get_shortest_path_total_calls += 1
+            # Cache results
+            if (driver_node, passenger_node) not in self.past_times:
+                self.past_times[(driver_node, passenger_node)] = pickup_time
+        
         # Time to get to pickup location is start time + time to drive to pickup location
         new_time = timedelta(hours=pickup_time) + max(self.drivers[driver]["time"], self.passengers[passenger]["time"])
 
         # Calculate driving time from passenger to their destination
+        start_time = time.time()
         driving_time = self.map.get_time(passenger_node, dest_node, hour, heuristic=heuristic)
+
+        end_time = time.time()
+        self.get_shortest_path_total_time += (end_time - start_time)
+        self.get_shortest_path_total_calls += 1
+
+        if (passenger_node, dest_node) not in self.past_times:
+            self.past_times[(passenger_node, dest_node)] = driving_time
+        
         # Start time at pickup location + time to drive to arrival location
         # So this is just dropoff time
         new_time = timedelta(hours=driving_time) + new_time
@@ -127,20 +136,18 @@ class B1_Matcher(BaseMatcher):
         # Update the closest node to the driver to the passenger's destination node
         self.nearest_nodes[driver] = dest_node
 
-        end_time = time.time()
-        execution_time = end_time - start_time
-        # print(f"A* Execution time: {execution_time} seconds")
-
         # Final arrival time - passenger login time
         self.d1 += ((new_time - self.passengers[passenger]["time"]).total_seconds() / 60)
         self.d2 += (driving_time - pickup_time) * 60
         print("D1: ", (new_time - self.passengers[passenger]["time"]).total_seconds() / 60)
         print("D2: ", (driving_time - pickup_time) * 60)
 
+        # Decrement the number of rides the driver has left before they are too exhausted
+        rides = self.drivers[driver]["rides"] - 1
+        self.total_rides_completed += 1
+
         # Increment the number of rides the driver has completed
         blockedHours = set([16, 17, 18, 19, 20, 21, 22, 23, 24])
-        print(hour)
-        rides = self.drivers[driver]["rides"] - 1
         if rides <= 0:
             if hour in blockedHours:
                 return True
@@ -680,16 +687,20 @@ class B3_Matcher(BaseMatcher):
                     hour = max(self.drivers[driver_id]["time"].hour, self.passengers[passenger_id]["time"].hour)
                 # Calculate driving time for driver to reach passenger
                 pickup_time, path = self.map.get_time_with_traffic(driver_node, passenger_node, hour)
-                print(path)
+
 
                 if (pickup_time < min_time):
                     min_time = pickup_time
                     min_driver = i
+                    selected_path = path
                     min_driver_node = driver_node
 
                 if pickup_time <= 0.1:
                     break
 
+            # Add Best Path to Traffic
+            self.map.add_traffic(selected_path, hour)
+            
             # print(f"AVG DRIVER CLOSEST Execution time: {execution_time/len(availible_drivers)} seconds")
             driver_id = availible_drivers[min_driver][1]
             del availible_drivers[min_driver]
@@ -827,7 +838,13 @@ class B4_Matcher(BaseMatcher):
         # Calculate driving time for driver to reach passenger
         if not pickup_time:
             start_time = time.time()
-            pickup_time = self.past_times([driver_node, passenger_node])
+            if (driver_node, passenger_node) not in self.past_times:
+                pickup_time = self.map.get_time(driver_node, passenger_node, hour, heuristic=heuristic)
+                print("pickup time not matched")
+            else:
+                pickup_time = self.past_times[(driver_node, passenger_node)]
+                print("pickup time matched")
+                self.match_counter += 1
             end_time = time.time()
             self.get_shortest_path_total_time += (end_time - start_time)
             self.get_shortest_path_total_calls += 1
@@ -837,7 +854,13 @@ class B4_Matcher(BaseMatcher):
 
         # Calculate driving time from passenger to their destination
         start_time = time.time()
-        driving_time = self.past_times[(passenger_node, dest_node)]
+        if (passenger_node, dest_node) not in self.past_times:
+            driving_time = self.map.get_time(passenger_node, dest_node, hour, heuristic=heuristic)
+            print("destination time not matched")
+        else:
+            driving_time = self.past_times[(passenger_node, dest_node)]
+            print("destination time matched")
+            self.match_counter += 1
 
         end_time = time.time()
         self.get_shortest_path_total_time += (end_time - start_time)
@@ -873,23 +896,22 @@ class B4_Matcher(BaseMatcher):
 
         # Get the closest available driver by euclidean distance
         min_time = float("inf")
-        min_driver_node = None
         min_driver = None
 
         # Minor optimization since if there's only 1 driver availible, then we don't need to check the pickup time
         if len(availible_drivers) != 1:
 
-            start_time = time.time()
             # Find closest nodes to each of driver and passenger
             passenger_node = self.get_closest_nodes(self.passengers[passenger_id]["source_lat"], self.passengers[passenger_id]["source_lon"])
-            end_time = time.time()
-            execution_time = end_time - start_time
-            # print(f"PASSENGER CLOSEST Execution time: {execution_time} seconds")
+            passenger_lat, passenger_lon = self.passengers[passenger_id]["source_lat"], self.passengers[passenger_id]["source_lon"]
 
-            execution_time = 0
-            for i in range(len(availible_drivers)):
+            # Sort all drivers by euclidean distance to passgner
+            availible_drivers.sort(key=lambda x: self.get_euclidean_distance(
+                                       passenger_lat, passenger_lon,
+                                       self.drivers[x[1]]["source_lat"],
+                                       self.drivers[x[1]]["source_lon"]))
 
-                start_time = time.time()
+            for i in range(min(10, len(availible_drivers))):
                 
                 driver = availible_drivers[i]
                 driver_id = driver[1]
@@ -907,7 +929,14 @@ class B4_Matcher(BaseMatcher):
                 
                 # Calculate driving time for driver to reach passenger
                 start_time = time.time()
-                pickup_time = self.past_times[(driver_node, passenger_node)]
+                if (driver_node, passenger_node) in self.past_times:
+                    pickup_time = self.past_times[(driver_node, passenger_node)]
+                    print("pickup time matched")
+                    self.match_counter += 1
+                else:
+                    pickup_time = self.map.get_time(driver_node, passenger_node, hour)
+                    print("pickup time not matched")
+                # self.past_times[(driver_node, passenger_node, hour)] = pickup_time
                 end_time = time.time()
                 self.get_shortest_path_total_time += (end_time - start_time)
                 self.get_shortest_path_total_calls += 1
@@ -915,6 +944,9 @@ class B4_Matcher(BaseMatcher):
                 if (pickup_time < min_time):
                     min_time = pickup_time
                     min_driver = i
+                
+                if pickup_time <= 0.1:
+                    break
 
             driver_id = availible_drivers[min_driver][1]
             del availible_drivers[min_driver]
