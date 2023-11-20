@@ -31,7 +31,7 @@ class T1_Matcher(BaseMatcher):
         # Get the first driver availible
         start_time, driver_id, _, _ = availible_drivers.popleft()
         # Process driver pick up and drop off; also get whether the driver returns for more rides
-        driver_return_to_road = self.complete_ride(driver_id, passenger_id)
+        driver_return_to_road = self.complete_ride(driver_id, passenger_id, heuristic="djikstras")
         
         if driver_return_to_road:
             # Re-queue into priority queue with end time of drop off and end position
@@ -78,7 +78,7 @@ class T2_Matcher(BaseMatcher):
 
         driver_id = availible_drivers[min_driver][1]
         del availible_drivers[min_driver]
-        driver_return_to_road = self.complete_ride(driver_id, passenger_id)
+        driver_return_to_road = self.complete_ride(driver_id, passenger_id, heuristic="djikstras")
 
         if driver_return_to_road:
             heapq.heappush(self.drivers_pq, (self.drivers[driver_id]["time"],
@@ -239,9 +239,6 @@ class T4_Matcher(BaseMatcher):
                 if (pickup_time < min_time):
                     min_time = pickup_time
                     min_driver = i
-                
-                if pickup_time <= 0.1:
-                    break
 
             driver_id = availible_drivers[min_driver][1]
             del availible_drivers[min_driver]
@@ -315,9 +312,15 @@ class T5_Matcher(BaseMatcher):
                                        self.drivers[x[1]]["source_lat"],
                                        self.drivers[x[1]]["source_lon"]))
 
-            for i in range(min(5, len(availible_drivers))):
+            # Candidate pool; prune all candidates outside the 10 closest by euclidean distance            
+            candidates = [(availible_drivers[i], i) for i in range(min(10, len(availible_drivers)))]
+            # Prioritize candidates with earlier log-on times
+            candidates.sort(key=lambda x: self.drivers[x[0][1]]["time"])
+
+            for i in range(len(candidates)):
                 
-                driver = availible_drivers[i]
+                driver = candidates[i][0]
+                driver_index = candidates[i][1]
                 driver_id = driver[1]
                 
                 driver_node = self.get_closest_nodes(self.drivers[driver_id]["source_lat"], self.drivers[driver_id]["source_lon"]) if driver_id not in self.nearest_nodes.keys() else self.nearest_nodes[driver_id]
@@ -342,7 +345,12 @@ class T5_Matcher(BaseMatcher):
 
                 if (pickup_time < min_time):
                     min_time = pickup_time
-                    min_driver = i
+                    min_driver = driver_index
+
+                # Check to see if we can make a match that gaurantees that the driver can
+                # pick up the passenger in 10 minutes or less
+                if pickup_time <= 0.1:
+                    break
 
             driver_id = availible_drivers[min_driver][1]
             del availible_drivers[min_driver]
