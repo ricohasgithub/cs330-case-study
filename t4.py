@@ -57,6 +57,7 @@ while len(unmatched_passengers) > 0 and len(curr_unmatched_passengers) > 0:
     print("Total D1:", t4_matcher.d1)
     print("Total D2:", t4_matcher.d2)
 
+t4_matcher.summarize_experiments()
 
 # Plotting
 fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(10, 8))
@@ -91,3 +92,4 @@ plt.show()
 
 # 42 seconds for first 200
 # 80.7 seconds for first 500
+# 621 seconds for all; with max of 5 closest drivers

@@ -57,9 +57,6 @@ class BaseMatcher:
     # Override if neccesary; run through the simulation of picking up and dropping off a passenger
     # returns True/False for if the driver is returning for more rides
     def complete_ride(self, driver, passenger, driver_node=None, passenger_node=None, pickup_time=None, heuristic="euclidean"):
-        
-        if not driver_node and not passenger_node:
-            start_time = time.time()
 
         # Find closest nodes to each of driver and passenger
         if not driver_node:
@@ -68,11 +65,6 @@ class BaseMatcher:
             passenger_node = self.get_closest_nodes(self.passengers[passenger]["source_lat"], self.passengers[passenger]["source_lon"])
         dest_node = self.get_closest_nodes(self.passengers[passenger]["dest_lat"], self.passengers[passenger]["dest_lon"])
         
-        if not driver_node and not passenger_node:
-            end_time = time.time()
-            execution_time = end_time - start_time
-            print(f"CLOSEST Execution time: {execution_time} seconds")
-
         # Calculate starting drive hour; note that we check for the day in the case which
         # a driver logs in at 23h the night before, and the passenger is requesting a ride
         # the day after at an early time, (say at 0h or 1h)
@@ -217,6 +209,7 @@ class RoadNetwork:
     # This method computes the shortest time needed for the driver to reach including traffic.
     # a passenger at some (lat, lon) coord. Default implementation is A* with a euclidean heuristic
     def get_time_with_traffic(self, s, t, hour, heuristic="euclidean"):
+
         # We model the road network as a weighted graph where the edge weights are travel times
         # return the minimum shortest path for minimum time to go from s to t
         pq, dist, prev = [(0, s)], defaultdict(lambda: float("inf")), {}
@@ -303,7 +296,7 @@ def read_drivers(path):
                 source_lat = float(data[1])
                 source_lon = float(data[2])
                 # Compute a random driver capacity from around 10-12 rides
-                drivers[index] = {"time": date_time, "rides": random.randint(10, 12),
+                drivers[index] = {"time": date_time, "rides": random.randint(7, 12),
                                   "source_lat": source_lat, "source_lon": source_lon}
                 index += 1
     return drivers

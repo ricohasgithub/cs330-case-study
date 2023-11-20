@@ -57,6 +57,7 @@ while len(unmatched_passengers) > 0 and len(curr_unmatched_passengers) > 0:
     print("Total D1:", t5_matcher.d1)
     print("Total D2:", t5_matcher.d2)
 
+t5_matcher.summarize_experiments()
 
 with open("past_times.json", "w") as outfile: 
     json.dump(t5_matcher.past_times, outfile)

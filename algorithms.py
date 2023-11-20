@@ -185,8 +185,15 @@ class T4_Matcher(BaseMatcher):
         node_coordinates = [((self.map.node_to_latlon[node]['lat'], self.map.node_to_latlon[node]['lon']), node) for node, _ in self.sorted_nodes]
         self.kd_tree = build_kd_tree(node_coordinates)
 
-    # def get_closest_nodes(self, lat, lon):
-    #     return find_nearest(self.kd_tree, (lat, lon)).id
+    def get_closest_nodes(self, lat, lon):
+        # Start timing current procedure
+        start_time = time.time()
+        nearest_node_id = find_nearest(self.kd_tree, (lat, lon)).id
+        # Compute total time spent finding nearest node
+        end_time = time.time()
+        self.get_closest_total_time += (end_time - start_time)
+        self.get_closest_total_calls += 1
+        return nearest_node_id
 
     # Get distance between a node and a coordinate
     def get_euclidean_distance(self, lat1, lon1, lat2, lon2):
@@ -194,63 +201,62 @@ class T4_Matcher(BaseMatcher):
         return math.sqrt((lat1 - lat2) ** 2 + (lon1 - lon2) ** 2)
 
     # # Binary search implementation
-    def get_closest_nodes(self, lat, lon):
+    # def get_closest_nodes(self, lat, lon):
 
-        # Start timing current procedure
-        start_time = time.time()
+    #     # Start timing current procedure
+    #     start_time = time.time()
 
-        low, high = 0, len(self.sorted_nodes) - 1
-        nearest = None
-        min_distance = float("inf")
+    #     low, high = 0, len(self.sorted_nodes) - 1
+    #     nearest = None
+    #     min_distance = float("inf")
 
-        while low <= high:
-            mid = (low + high) // 2
-            current_node, _ = self.sorted_nodes[mid]  # Extracting the node from the tuple
+    #     while low <= high:
+    #         mid = (low + high) // 2
+    #         current_node, _ = self.sorted_nodes[mid]  # Extracting the node from the tuple
 
-            distance = self.map.get_distance(
-                current_node,
-                lat,
-                lon
-            )
+    #         distance = self.map.get_distance(
+    #             current_node,
+    #             lat,
+    #             lon
+    #         )
 
-            if distance < min_distance:
-                min_distance = distance
-                nearest = current_node
+    #         if distance < min_distance:
+    #             min_distance = distance
+    #             nearest = current_node
 
-            if lat < self.map.node_to_latlon[current_node]['lat'] or (
-                lat == self.map.node_to_latlon[current_node]['lat'] and lon < self.map.node_to_latlon[current_node]['lon']
-            ):
-                high = mid - 1
-            else:
-                low = mid + 1
+    #         if lat < self.map.node_to_latlon[current_node]['lat'] or (
+    #             lat == self.map.node_to_latlon[current_node]['lat'] and lon < self.map.node_to_latlon[current_node]['lon']
+    #         ):
+    #             high = mid - 1
+    #         else:
+    #             low = mid + 1
 
-        # Find a 50-neighbor radius for to find a local optima
-        lower_bound = max(0, mid - 25)
-        upper_bound = min(len(self.sorted_nodes), mid + 25)
-        lon_nearest = nearest
+    #     # Find a 50-neighbor radius for to find a local optima
+    #     lower_bound = max(0, mid - 25)
+    #     upper_bound = min(len(self.sorted_nodes), mid + 25)
+    #     lon_nearest = nearest
 
-        for i in range(lower_bound, upper_bound):
-            current_node, _ = self.sorted_nodes[i]
-            c_dist = self.get_euclidean_distance(lat, lon,
-                                            self.map.node_to_latlon[current_node]["lat"],
-                                            self.map.node_to_latlon[current_node]["lon"])
-            if c_dist < min_distance:
-                min_distance = c_dist
-                lon_nearest = current_node
+    #     for i in range(lower_bound, upper_bound):
+    #         current_node, _ = self.sorted_nodes[i]
+    #         c_dist = self.get_euclidean_distance(lat, lon,
+    #                                         self.map.node_to_latlon[current_node]["lat"],
+    #                                         self.map.node_to_latlon[current_node]["lon"])
+    #         if c_dist < min_distance:
+    #             min_distance = c_dist
+    #             lon_nearest = current_node
 
-        # Compute total time spent finding nearest node
-        end_time = time.time()
-        self.get_closest_total_time += (end_time - start_time)
-        self.get_closest_total_calls += 1
+    #     # Compute total time spent finding nearest node
+    #     end_time = time.time()
+    #     self.get_closest_total_time += (end_time - start_time)
+    #     self.get_closest_total_calls += 1
 
-        return lon_nearest
+    #     return lon_nearest
 
     # # Get best driver for a given passenger by finding first availible driver
     def match(self, availible_drivers, passenger_id):
 
         # Get the closest available driver by euclidean distance
         min_time = float("inf")
-        min_driver_node = None
         min_driver = None
 
         # Minor optimization since if there's only 1 driver availible, then we don't need to check the pickup time
@@ -258,15 +264,8 @@ class T4_Matcher(BaseMatcher):
 
             # Find closest nodes to each of driver and passenger
             passenger_node = self.get_closest_nodes(self.passengers[passenger_id]["source_lat"], self.passengers[passenger_id]["source_lon"])
-            passenger_lat, passenger_lon = self.passengers[passenger_id]["source_lat"], self.passengers[passenger_id]["source_lon"]
 
-            # Sort all drivers by euclidean distance to passenger
-            availible_drivers.sort(key=lambda x: self.get_euclidean_distance(
-                                       passenger_lat, passenger_lon,
-                                       self.drivers[x[1]]["source_lat"],
-                                       self.drivers[x[1]]["source_lon"]))
-
-            for i in range(min(5, len(availible_drivers))):
+            for i in range(len(availible_drivers)):
                 
                 driver = availible_drivers[i]
                 driver_id = driver[1]

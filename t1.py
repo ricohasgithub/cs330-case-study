@@ -99,8 +99,8 @@ x_times = [t[0] for t in passenger_drivers]
 y_passengers = [t[1] for t in passenger_drivers]
 y_drivers = [t[2] for t in passenger_drivers]
 
-plt.plot(x_times, y_d1, marker='o', linestyle='-', color='blue', label='Passengers')
-plt.plot(x_times, y_d2, marker='s', linestyle='--', color='red', label='Drivers')
+plt.plot(x_times, y_passengers, marker='o', linestyle='-', color='blue', label='Passengers')
+plt.plot(x_times, y_drivers, marker='s', linestyle='--', color='red', label='Drivers')
 
 plt.xlabel('Time')
 plt.ylabel('# of People')
