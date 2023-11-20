@@ -137,7 +137,7 @@ class T3_Matcher(BaseMatcher):
                     hour = max(self.drivers[driver_id]["time"].hour, self.passengers[passenger_id]["time"].hour)
                 
                 start_time = time.time()
-                pickup_time = self.map.get_time(driver_node, passenger_node, hour)
+                pickup_time = self.map.get_time(driver_node, passenger_node, hour, heuristic="djikstras")
                 end_time = time.time()
                 self.get_shortest_path_total_time += (end_time - start_time)
                 self.get_shortest_path_total_calls += 1
@@ -315,7 +315,7 @@ class T5_Matcher(BaseMatcher):
                                        self.drivers[x[1]]["source_lat"],
                                        self.drivers[x[1]]["source_lon"]))
 
-            for i in range(min(5, len(availible_drivers))):
+            for i in range(min(10, len(availible_drivers))):
                 
                 driver = availible_drivers[i]
                 driver_id = driver[1]
@@ -343,6 +343,9 @@ class T5_Matcher(BaseMatcher):
                 if (pickup_time < min_time):
                     min_time = pickup_time
                     min_driver = i
+                
+                if pickup_time <= 0.1:
+                    break
 
             driver_id = availible_drivers[min_driver][1]
             del availible_drivers[min_driver]

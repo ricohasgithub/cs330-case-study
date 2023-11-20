@@ -87,9 +87,6 @@ class B1_Matcher(BaseMatcher):
     # overrides
     def complete_ride(self, driver, passenger, driver_node=None, passenger_node=None, pickup_time=None, heuristic="euclidean"):
         
-        if not driver_node and not passenger_node:
-            start_time = time.time()
-
         # Find closest nodes to each of driver and passenger
         if not driver_node:
             driver_node = self.get_closest_nodes(self.drivers[driver]["source_lat"], self.drivers[driver]["source_lon"]) if not driver in self.nearest_nodes.keys() else self.nearest_nodes[driver]
@@ -97,12 +94,9 @@ class B1_Matcher(BaseMatcher):
             passenger_node = self.get_closest_nodes(self.passengers[passenger]["source_lat"], self.passengers[passenger]["source_lon"])
         dest_node = self.get_closest_nodes(self.passengers[passenger]["dest_lat"], self.passengers[passenger]["dest_lon"])
         
-        if not driver_node and not passenger_node:
-            end_time = time.time()
-            execution_time = end_time - start_time
-            print(f"CLOSEST Execution time: {execution_time} seconds")
-
-        # Calculate starting drive hour
+        # Calculate starting drive hour; note that we check for the day in the case which
+        # a driver logs in at 23h the night before, and the passenger is requesting a ride
+        # the day after at an early time, (say at 0h or 1h)
         if self.drivers[driver]["time"].day < self.passengers[passenger]["time"].day:
             hour = self.passengers[passenger]["time"].hour
         elif self.drivers[driver]["time"].day > self.passengers[passenger]["time"].day:
@@ -110,16 +104,31 @@ class B1_Matcher(BaseMatcher):
         else:
             hour = max(self.drivers[driver]["time"].hour, self.passengers[passenger]["time"].hour)
 
-        start_time = time.time()
-
         # Calculate driving time for driver to reach passenger
         if not pickup_time:
+            start_time = time.time()
             pickup_time = self.map.get_time(driver_node, passenger_node, hour, heuristic=heuristic)
+            end_time = time.time()
+            self.get_shortest_path_total_time += (end_time - start_time)
+            self.get_shortest_path_total_calls += 1
+            # Cache results
+            if (driver_node, passenger_node) not in self.past_times:
+                self.past_times[(driver_node, passenger_node)] = pickup_time
+        
         # Time to get to pickup location is start time + time to drive to pickup location
         new_time = timedelta(hours=pickup_time) + max(self.drivers[driver]["time"], self.passengers[passenger]["time"])
 
         # Calculate driving time from passenger to their destination
+        start_time = time.time()
         driving_time = self.map.get_time(passenger_node, dest_node, hour, heuristic=heuristic)
+
+        end_time = time.time()
+        self.get_shortest_path_total_time += (end_time - start_time)
+        self.get_shortest_path_total_calls += 1
+
+        if (passenger_node, dest_node) not in self.past_times:
+            self.past_times[(passenger_node, dest_node)] = driving_time
+        
         # Start time at pickup location + time to drive to arrival location
         # So this is just dropoff time
         new_time = timedelta(hours=driving_time) + new_time
@@ -127,20 +136,18 @@ class B1_Matcher(BaseMatcher):
         # Update the closest node to the driver to the passenger's destination node
         self.nearest_nodes[driver] = dest_node
 
-        end_time = time.time()
-        execution_time = end_time - start_time
-        # print(f"A* Execution time: {execution_time} seconds")
-
         # Final arrival time - passenger login time
         self.d1 += ((new_time - self.passengers[passenger]["time"]).total_seconds() / 60)
         self.d2 += (driving_time - pickup_time) * 60
         print("D1: ", (new_time - self.passengers[passenger]["time"]).total_seconds() / 60)
         print("D2: ", (driving_time - pickup_time) * 60)
 
+        # Decrement the number of rides the driver has left before they are too exhausted
+        rides = self.drivers[driver]["rides"] - 1
+        self.total_rides_completed += 1
+
         # Increment the number of rides the driver has completed
         blockedHours = set([16, 17, 18, 19, 20, 21, 22, 23, 24])
-        print(hour)
-        rides = self.drivers[driver]["rides"] - 1
         if rides <= 0:
             if hour in blockedHours:
                 return True

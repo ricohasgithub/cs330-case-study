@@ -20,6 +20,8 @@ import matplotlib.dates as mdates
 # Contains driver states for simulation
 b1_matcher = B1_Matcher()
 
+passenger_drivers = []
+
 # Priority queue of availible drivers
 availible_drivers = []
 # List of all unmatched passengers by increasing time
@@ -40,6 +42,9 @@ while len(unmatched_passengers) > 0 and len(curr_unmatched_passengers) > 0:
     while b1_matcher.drivers_pq[0][0] <= curr_time:
         data = heapq.heappop(b1_matcher.drivers_pq)
         availible_drivers.append((data[0], data[1], data[2], data[3]))
+
+    # Keep track of number of passengers looking for a ride and the number of availible drivers
+    passenger_drivers.append((curr_time, len(curr_unmatched_passengers), len(availible_drivers)))
 
     # Match all availible drivers to customers
     while len(availible_drivers) > 0 and len(curr_unmatched_passengers) > 0:
@@ -62,6 +67,7 @@ while len(unmatched_passengers) > 0 and len(curr_unmatched_passengers) > 0:
     print("Total D1:", b1_matcher.d1)
     print("Total D2:", b1_matcher.d2)
 
+b1_matcher.summarize_experiments()
 
 # Plotting
 fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(10, 8))
@@ -90,6 +96,31 @@ fig.autofmt_xdate()
 
 # Labeling and legend
 plt.suptitle('Line Plots with Datetime on X-axis')
+
+# Show the plot
+plt.show()
+
+
+# Summary statistics for desiderata
+plot = sorted(plot)
+x_times = [t[0] for t in passenger_drivers]
+y_passengers = [t[1] for t in passenger_drivers]
+y_drivers = [t[2] for t in passenger_drivers]
+
+plt.plot(x_times, y_passengers, marker='o', linestyle='-', color='blue', label='Passengers')
+plt.plot(x_times, y_drivers, marker='s', linestyle='--', color='red', label='Drivers')
+
+plt.xlabel('Time')
+plt.ylabel('# of People')
+plt.title("Passenger Demand and Driver Availibility")
+
+plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+plt.gca().xaxis.set_major_locator(mdates.DayLocator())
+plt.legend()
+
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
 
 # Show the plot
 plt.show()

@@ -301,7 +301,7 @@ def read_drivers(path):
                 source_lat = float(data[1])
                 source_lon = float(data[2])
                 # Compute a random driver capacity from around 10-12 rides
-                drivers[index] = {"time": date_time, "rides": random.randint(7, 12),
+                drivers[index] = {"time": date_time, "rides": random.randint(8, 13),
                                   "source_lat": source_lat, "source_lon": source_lon}
                 index += 1
     return drivers
