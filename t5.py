@@ -86,6 +86,3 @@ fig.autofmt_xdate()
 
 # Show the plot
 plt.show()
-
-# 34 seconds for first 200
-# 73.7 seconds for first 500

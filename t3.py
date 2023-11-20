@@ -86,5 +86,3 @@ fig.autofmt_xdate()
 
 # Show the plot
 plt.show()
-
-# 105 seconds for first 200 samples

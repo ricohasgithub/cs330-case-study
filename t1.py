@@ -116,5 +116,3 @@ plt.tight_layout()
 
 # Show the plot
 plt.show()
-
-# 27 seconds for first 200 samples

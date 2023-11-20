@@ -116,7 +116,3 @@ plt.tight_layout()
 
 # Show the plot
 plt.show()
-
-# 42 seconds for first 200
-# 80.7 seconds for first 500
-# 621 seconds for all; with max of 5 closest drivers
