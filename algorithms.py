@@ -325,13 +325,10 @@ class T5_Matcher(BaseMatcher):
             # Insert time first so that heap sorts from min to max time
             heapq.heappush(self.drivers_pq, (data["time"], id,
                                              data["source_lat"], data["source_lon"]))
-        
         self.sorted_nodes = sorted(
                     self.map.graph.items(),
                     key=lambda item: (self.map.node_to_latlon[item[0]]['lat'], self.map.node_to_latlon[item[0]]['lon'])
                 )
-        node_coordinates = [(self.map.node_to_latlon[node]['lat'], self.map.node_to_latlon[node]['lon']) for node, _ in self.sorted_nodes]
-
 
     def get_euclidean_distance(self, lat1, lon1, lat2, lon2):
         return math.sqrt((lat2 - lat1)**2 + (lon2 - lon1)**2)
@@ -392,23 +389,22 @@ class T5_Matcher(BaseMatcher):
 
         # Get the closest available driver by euclidean distance
         min_time = float("inf")
-        min_driver_node = None
         min_driver = None
 
         # Minor optimization since if there's only 1 driver availible, then we don't need to check the pickup time
         if len(availible_drivers) != 1:
 
-            start_time = time.time()
             # Find closest nodes to each of driver and passenger
             passenger_node = self.get_closest_nodes(self.passengers[passenger_id]["source_lat"], self.passengers[passenger_id]["source_lon"])
-            end_time = time.time()
-            execution_time = end_time - start_time
-            # print(f"PASSENGER CLOSEST Execution time: {execution_time} seconds")
+            passenger_lat, passenger_lon = self.passengers[passenger_id]["source_lat"], self.passengers[passenger_id]["source_lon"]
 
-            execution_time = 0
-            for i in range(len(availible_drivers)):
+            # Sort all drivers by euclidean distance to passgner
+            availible_drivers.sort(key=lambda x: self.get_euclidean_distance(
+                                       passenger_lat, passenger_lon,
+                                       self.drivers[x[1]]["source_lat"],
+                                       self.drivers[x[1]]["source_lon"]))
 
-                start_time = time.time()
+            for i in range(min(5, len(availible_drivers))):
                 
                 driver = availible_drivers[i]
                 driver_id = driver[1]
