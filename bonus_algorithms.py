@@ -680,16 +680,20 @@ class B3_Matcher(BaseMatcher):
                     hour = max(self.drivers[driver_id]["time"].hour, self.passengers[passenger_id]["time"].hour)
                 # Calculate driving time for driver to reach passenger
                 pickup_time, path = self.map.get_time_with_traffic(driver_node, passenger_node, hour)
-                print(path)
+
 
                 if (pickup_time < min_time):
                     min_time = pickup_time
                     min_driver = i
+                    selected_path = path
                     min_driver_node = driver_node
 
                 if pickup_time <= 0.1:
                     break
 
+            # Add Best Path to Traffic
+            self.map.add_traffic(selected_path, hour)
+            
             # print(f"AVG DRIVER CLOSEST Execution time: {execution_time/len(availible_drivers)} seconds")
             driver_id = availible_drivers[min_driver][1]
             del availible_drivers[min_driver]
