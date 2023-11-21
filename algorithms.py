@@ -242,7 +242,7 @@ class T4_Matcher(BaseMatcher):
 
             driver_id = availible_drivers[min_driver][1]
             del availible_drivers[min_driver]
-            driver_return_to_road = self.complete_ride(driver_id, passenger_id, pickup_time=pickup_time)
+            driver_return_to_road = self.complete_ride(driver_id, passenger_id, pickup_time=min_time)
         else:
             driver_id = availible_drivers[0][1]
             del availible_drivers[0]
@@ -354,7 +354,7 @@ class T5_Matcher(BaseMatcher):
 
             driver_id = availible_drivers[min_driver][1]
             del availible_drivers[min_driver]
-            driver_return_to_road = self.complete_ride(driver_id, passenger_id, pickup_time=pickup_time, heuristic="manhattan")
+            driver_return_to_road = self.complete_ride(driver_id, passenger_id, pickup_time=min_time, heuristic="manhattan")
         else:
             driver_id = availible_drivers[0][1]
             del availible_drivers[0]
