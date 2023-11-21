@@ -196,12 +196,12 @@ class RoadNetwork:
                         # Note that h is the euclidean distance, so we just call get_distance to t
                         v_cost = dist[v] + self.get_distance(t, 
                                                             self.node_to_latlon[v]["lat"],
-                                                            self.node_to_latlon[v]["lon"])
+                                                            self.node_to_latlon[v]["lon"]) / self.speed_limit
                     elif heuristic == "djikstras":
                         v_cost = dist[v]
                     elif heuristic == "manhattan":
                         v_cost = dist[v] + abs(self.node_to_latlon[t]["lat"] -
-                                            self.node_to_latlon[v]["lat"]) + abs(self.node_to_latlon[t]["lon"] - self.node_to_latlon[v]["lon"])
+                                            self.node_to_latlon[v]["lat"]) + abs(self.node_to_latlon[t]["lon"] - self.node_to_latlon[v]["lon"]) / self.speed_limit
                     heapq.heappush(pq, (v_cost, v))
 
         return dist[t]
@@ -242,12 +242,12 @@ class RoadNetwork:
                         # Note that h is the euclidean distance
                         v_cost = dist[v] + self.get_distance(t, 
                                                             self.node_to_latlon[v]["lat"],
-                                                            self.node_to_latlon[v]["lon"])
+                                                            self.node_to_latlon[v]["lon"]) /  self.speed_limit
                     elif heuristic == "djikstras":
                         v_cost = dist[v]
                     elif heuristic == "manhattan":
                         v_cost = dist[v] + abs(self.node_to_latlon[t]["lat"] -
-                                            self.node_to_latlon[v]["lat"]) + abs(self.node_to_latlon[t]["lon"] - self.node_to_latlon[v]["lon"])
+                                            self.node_to_latlon[v]["lat"]) + abs(self.node_to_latlon[t]["lon"] - self.node_to_latlon[v]["lon"]) / self.speed_limit
                     heapq.heappush(pq, (v_cost, v))
 
         path = []

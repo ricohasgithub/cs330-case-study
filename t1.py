@@ -12,7 +12,10 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
 # Contains driver states for simulation
+start_time = time.time()
 t1_matcher = T1_Matcher()
+end_time = time.time()
+print("Pre-process time:", end_time - start_time)
 
 # Priority queue of availible drivers
 availible_drivers = deque()
@@ -87,9 +90,6 @@ ax2.legend()
 
 fig.autofmt_xdate()
 
-# Labeling and legend
-plt.suptitle('Line Plots with Datetime on X-axis')
-
 # Creating the plot
 plt.figure(figsize=(10, 6))
 
@@ -116,5 +116,3 @@ plt.tight_layout()
 
 # Show the plot
 plt.show()
-
-# 27 seconds for first 200 samples

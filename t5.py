@@ -59,8 +59,6 @@ while len(unmatched_passengers) > 0 and len(curr_unmatched_passengers) > 0:
 
 t5_matcher.summarize_experiments()
 
-""" with open("past_times.json", "w") as outfile: 
-    json.dump(t5_matcher.past_times, outfile) """
 # Plotting
 fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(10, 8))
 
@@ -86,11 +84,5 @@ ax2.legend()
 
 fig.autofmt_xdate()
 
-# Labeling and legend
-plt.suptitle('Line Plots with Datetime on X-axis')
-
 # Show the plot
 plt.show()
-
-# 34 seconds for first 200
-# 73.7 seconds for first 500

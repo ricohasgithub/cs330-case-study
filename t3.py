@@ -84,10 +84,5 @@ ax2.legend()
 
 fig.autofmt_xdate()
 
-# Labeling and legend
-plt.suptitle('Line Plots with Datetime on X-axis')
-
 # Show the plot
 plt.show()
-
-# 105 seconds for first 200 samples

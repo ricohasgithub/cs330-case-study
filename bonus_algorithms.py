@@ -685,7 +685,13 @@ class B4_Matcher(BaseMatcher):
         # Calculate driving time for driver to reach passenger
         if not pickup_time:
             start_time = time.time()
-            pickup_time = self.past_times([driver_node, passenger_node])
+            if (driver_node, passenger_node) not in self.past_times:
+                pickup_time = self.map.get_time(driver_node, passenger_node, hour, heuristic=heuristic)
+                print("pickup time not matched")
+            else:
+                pickup_time = self.past_times[(driver_node, passenger_node)]
+                print("pickup time matched")
+                self.match_counter += 1
             end_time = time.time()
             self.get_shortest_path_total_time += (end_time - start_time)
             self.get_shortest_path_total_calls += 1
@@ -695,7 +701,13 @@ class B4_Matcher(BaseMatcher):
 
         # Calculate driving time from passenger to their destination
         start_time = time.time()
-        driving_time = self.past_times[(passenger_node, dest_node)]
+        if (passenger_node, dest_node) not in self.past_times:
+            driving_time = self.map.get_time(passenger_node, dest_node, hour, heuristic=heuristic)
+            print("destination time not matched")
+        else:
+            driving_time = self.past_times[(passenger_node, dest_node)]
+            print("destination time matched")
+            self.match_counter += 1
 
         end_time = time.time()
         self.get_shortest_path_total_time += (end_time - start_time)
@@ -731,23 +743,22 @@ class B4_Matcher(BaseMatcher):
 
         # Get the closest available driver by euclidean distance
         min_time = float("inf")
-        min_driver_node = None
         min_driver = None
 
         # Minor optimization since if there's only 1 driver availible, then we don't need to check the pickup time
         if len(availible_drivers) != 1:
 
-            start_time = time.time()
             # Find closest nodes to each of driver and passenger
             passenger_node = self.get_closest_nodes(self.passengers[passenger_id]["source_lat"], self.passengers[passenger_id]["source_lon"])
-            end_time = time.time()
-            execution_time = end_time - start_time
-            # print(f"PASSENGER CLOSEST Execution time: {execution_time} seconds")
+            passenger_lat, passenger_lon = self.passengers[passenger_id]["source_lat"], self.passengers[passenger_id]["source_lon"]
 
-            execution_time = 0
-            for i in range(len(availible_drivers)):
+            # Sort all drivers by euclidean distance to passgner
+            availible_drivers.sort(key=lambda x: self.get_euclidean_distance(
+                                       passenger_lat, passenger_lon,
+                                       self.drivers[x[1]]["source_lat"],
+                                       self.drivers[x[1]]["source_lon"]))
 
-                start_time = time.time()
+            for i in range(min(10, len(availible_drivers))):
                 
                 driver = availible_drivers[i]
                 driver_id = driver[1]
@@ -765,7 +776,14 @@ class B4_Matcher(BaseMatcher):
                 
                 # Calculate driving time for driver to reach passenger
                 start_time = time.time()
-                pickup_time = self.past_times[(driver_node, passenger_node)]
+                if (driver_node, passenger_node) in self.past_times:
+                    pickup_time = self.past_times[(driver_node, passenger_node)]
+                    print("pickup time matched")
+                    self.match_counter += 1
+                else:
+                    pickup_time = self.map.get_time(driver_node, passenger_node, hour)
+                    print("pickup time not matched")
+                # self.past_times[(driver_node, passenger_node, hour)] = pickup_time
                 end_time = time.time()
                 self.get_shortest_path_total_time += (end_time - start_time)
                 self.get_shortest_path_total_calls += 1
@@ -773,6 +791,9 @@ class B4_Matcher(BaseMatcher):
                 if (pickup_time < min_time):
                     min_time = pickup_time
                     min_driver = i
+                
+                if pickup_time <= 0.1:
+                    break
 
             driver_id = availible_drivers[min_driver][1]
             del availible_drivers[min_driver]
