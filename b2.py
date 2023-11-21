@@ -20,8 +20,8 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
 # Contains driver states for simulation
-b2_matcher = B2_Matcher()
-# b2_matcher = B2_Default_Matcher()
+# b2_matcher = B2_Matcher()
+b2_matcher = B2_Default_Matcher()
 
 # Priority queue of availible drivers
 availible_drivers = []
@@ -65,6 +65,8 @@ while len(unmatched_passengers) > 0 and len(curr_unmatched_passengers) > 0:
     print("Total D1:", b2_matcher.d1)
     print("Total D2:", b2_matcher.d2)
 
+b2_matcher.summarize_experiments()
+
 
 # Plotting
 fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(10, 8))
@@ -102,12 +104,12 @@ plt.show()
 # Plot of Driver Equity
 
 # Counting the number of keys in each range
-count_0_5 = len([key for key, value in b2_matcher.numDriverRides.items() if 0 <= value <= 5])
-count_5_15 = len([key for key, value in b2_matcher.numDriverRides.items() if 5 < value <= 15])
-count_15_plus = len([key for key, value in b2_matcher.numDriverRides.items() if value > 15])
+count_0_5 = len([key for key, value in b2_matcher.numDriverRides.items() if 0 <= value <= 4])
+count_5_15 = len([key for key, value in b2_matcher.numDriverRides.items() if 4 < value <= 8])
+count_15_plus = len([key for key, value in b2_matcher.numDriverRides.items() if value > 8])
 
 # Data for plotting
-ranges = ['0-5', '6-15', '16+']
+ranges = ['0-4', '4-8', '9+']
 counts = [count_0_5, count_5_15, count_15_plus]
 
 # Plotting
