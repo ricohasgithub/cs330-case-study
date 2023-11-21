@@ -27,6 +27,9 @@ class BaseMatcher:
         self.get_shortest_path_total_time = 0
         self.get_closest_total_calls = 0
         self.get_shortest_path_total_calls = 0
+        self.total_wait_time = 0
+        self.total_pickup_time = 0
+        self.total_drive_time = 0
         self.past_times = dict()
 
     def update_driver(self, id, time, rides, lat, lon):
@@ -85,9 +88,10 @@ class BaseMatcher:
             # Cache results
             if (driver_node, passenger_node) not in self.past_times:
                 self.past_times[(driver_node, passenger_node)] = pickup_time
-        
+
         # Time to get to pickup location is start time + time to drive to pickup location
         new_time = timedelta(hours=pickup_time) + max(self.drivers[driver]["time"], self.passengers[passenger]["time"])
+        self.total_wait_time += (max(self.drivers[driver]["time"], self.passengers[passenger]["time"]) - self.passengers[passenger]["time"]).total_seconds() / 60
 
         # Calculate driving time from passenger to their destination
         start_time = time.time()
@@ -113,6 +117,9 @@ class BaseMatcher:
         print("D1: ", (new_time - self.passengers[passenger]["time"]).total_seconds() / 60)
         print("D2: ", (driving_time - pickup_time) * 60)
 
+        self.total_pickup_time += pickup_time * 60
+        self.total_drive_time += driving_time * 60
+
         # Decrement the number of rides the driver has left before they are too exhausted
         rides = self.drivers[driver]["rides"] - 1
         self.total_rides_completed += 1
@@ -136,6 +143,10 @@ class BaseMatcher:
         print("---------D1------------")
         print("Cumulative D1:", self.d1)
         print("Average D1:", self.d1 / self.total_rides_completed)
+
+        print("Average wait time:", self.total_wait_time / self.total_rides_completed)
+        print("Average pickup time:", self.total_pickup_time / self.total_rides_completed)
+        print("Average trip time:", self.total_drive_time / self.total_rides_completed)
 
         print("---------D2------------")
         print("Cumulative D2:", self.d2)
@@ -301,7 +312,7 @@ def read_drivers(path):
                 source_lat = float(data[1])
                 source_lon = float(data[2])
                 # Compute a random driver capacity from around 10-12 rides
-                drivers[index] = {"time": date_time, "rides": random.randint(8, 13),
+                drivers[index] = {"time": date_time, "rides": random.randint(10, 12),
                                   "source_lat": source_lat, "source_lon": source_lon}
                 index += 1
     return drivers
