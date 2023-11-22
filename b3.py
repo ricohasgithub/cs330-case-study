@@ -59,6 +59,7 @@ while len(unmatched_passengers) > 0 and len(curr_unmatched_passengers) > 0:
     print("Total D1:", b3_matcher.d1)
     print("Total D2:", b3_matcher.d2)
 
+b3_matcher.summarize_experiments()
 
 # Plotting
 fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(10, 8))

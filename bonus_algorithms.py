@@ -182,7 +182,7 @@ class B1_Matcher(BaseMatcher):
 
             driver_id = availible_drivers[min_driver][1]
             del availible_drivers[min_driver]
-            driver_return_to_road = self.complete_ride(driver_id, passenger_id, pickup_time=pickup_time, heuristic="manhattan")
+            driver_return_to_road = self.complete_ride(driver_id, passenger_id, pickup_time=min_time, heuristic="manhattan")
         else:
             driver_id = availible_drivers[0][1]
             del availible_drivers[0]
@@ -238,6 +238,7 @@ class B2_Matcher(BaseMatcher):
 
         # Get the closest available driver by euclidean distance
         min_time = float("inf")
+        min_mod_time = float("inf")
         min_driver = None
 
         # Minor optimization since if there's only 1 driver availible, then we don't need to check the pickup time
@@ -253,7 +254,7 @@ class B2_Matcher(BaseMatcher):
                                        self.drivers[x[1]]["source_lat"],
                                        self.drivers[x[1]]["source_lon"]))
 
-            for i in range(min(10, len(availible_drivers))):
+            for i in range(min(5, len(availible_drivers))):
                 
                 driver = availible_drivers[i]
                 driver_id = driver[1]
@@ -279,12 +280,12 @@ class B2_Matcher(BaseMatcher):
                 self.get_shortest_path_total_calls += 1
 
                 numRides = self.numDriverRides.get(driver_id, 0)
-                if numRides > 8:
-                    pickup_time = (1 + (numRides * 5)) * pickup_time
+                mod_pickup_time = pickup_time * (1.5 ** (numRides / 10 + 1))
+                
 
-
-                if (pickup_time < min_time):
+                if (mod_pickup_time < min_mod_time):
                     min_time = pickup_time
+                    min_mod_time = mod_pickup_time
                     min_driver = i
                 
                 if pickup_time <= 0.1:
@@ -293,10 +294,11 @@ class B2_Matcher(BaseMatcher):
             driver_id = availible_drivers[min_driver][1]
             del availible_drivers[min_driver]
             self.numDriverRides[driver_id] = self.numDriverRides.get(driver_id, 0) + 1
-            driver_return_to_road = self.complete_ride(driver_id, passenger_id, pickup_time=pickup_time, heuristic="manhattan")
+            driver_return_to_road = self.complete_ride(driver_id, passenger_id, pickup_time=min_time, heuristic="manhattan")
         else:
             driver_id = availible_drivers[0][1]
             del availible_drivers[0]
+            self.numDriverRides[driver_id] = self.numDriverRides.get(driver_id, 0) + 1
             driver_return_to_road = self.complete_ride(driver_id, passenger_id, heuristic="manhattan")
             
         if driver_return_to_road:
@@ -400,10 +402,11 @@ class B2_Default_Matcher(BaseMatcher):
             driver_id = availible_drivers[min_driver][1]
             del availible_drivers[min_driver]
             self.numDriverRides[driver_id] = self.numDriverRides.get(driver_id, 0) + 1
-            driver_return_to_road = self.complete_ride(driver_id, passenger_id, pickup_time=pickup_time, heuristic="manhattan")
+            driver_return_to_road = self.complete_ride(driver_id, passenger_id, pickup_time=min_time, heuristic="manhattan")
         else:
             driver_id = availible_drivers[0][1]
             del availible_drivers[0]
+            self.numDriverRides[driver_id] = self.numDriverRides.get(driver_id, 0) + 1
             driver_return_to_road = self.complete_ride(driver_id, passenger_id, heuristic="manhattan")
             
         if driver_return_to_road:
@@ -429,61 +432,27 @@ class B3_Matcher(BaseMatcher):
             # Insert time first so that heap sorts from min to max time
             heapq.heappush(self.drivers_pq, (data["time"], id,
                                              data["source_lat"], data["source_lon"]))
-        
-        # Assuming latlon dictionaries have 'lat' and 'lon' keys
         self.sorted_nodes = sorted(
-            self.map.graph.items(),
-            key=lambda item: (self.map.node_to_latlon[item[0]]['lat'], self.map.node_to_latlon[item[0]]['lon'])
-        )
+                    self.map.graph.items(),
+                    key=lambda item: (self.map.node_to_latlon[item[0]]['lat'], self.map.node_to_latlon[item[0]]['lon'])
+                )
+        node_coordinates = [((self.map.node_to_latlon[node]['lat'], self.map.node_to_latlon[node]['lon']), node) for node, _ in self.sorted_nodes]
+        self.kd_tree = build_kd_tree(node_coordinates)
 
+    def get_closest_nodes(self, lat, lon):
+        # Start timing current procedure
+        start_time = time.time()
+        nearest_node_id = find_nearest(self.kd_tree, (lat, lon)).id
+        # Compute total time spent finding nearest node
+        end_time = time.time()
+        self.get_closest_total_time += (end_time - start_time)
+        self.get_closest_total_calls += 1
+        return nearest_node_id
+    
     # Get distance between a node and a coordinate
     def get_euclidean_distance(self, lat1, lon1, lat2, lon2):
         # Return euclidean norm; assume we are on a locally flat plane
         return math.sqrt((lat1 - lat2) ** 2 + (lon1 - lon2) ** 2)
-
-    # Binary search implementation
-    def get_closest_nodes(self, lat, lon):
-
-        low, high = 0, len(self.sorted_nodes) - 1
-        nearest = None
-        min_distance = float("inf")
-
-        while low <= high:
-            mid = (low + high) // 2
-            current_node, _ = self.sorted_nodes[mid]  # Extracting the node from the tuple
-
-            distance = self.map.get_distance(
-                current_node,
-                lat,
-                lon
-            )
-
-            if distance < min_distance:
-                min_distance = distance
-                nearest = current_node
-
-            if lat < self.map.node_to_latlon[current_node]['lat'] or (
-                lat == self.map.node_to_latlon[current_node]['lat'] and lon < self.map.node_to_latlon[current_node]['lon']
-            ):
-                high = mid - 1
-            else:
-                low = mid + 1
-
-        # Find a 50-neighbor radius for to find a local optima
-        lower_bound = max(0, mid - 25)
-        upper_bound = min(len(self.sorted_nodes), mid + 25)
-        lon_nearest = nearest
-
-        for i in range(lower_bound, upper_bound):
-            current_node, _ = self.sorted_nodes[i]
-            c_dist = self.get_euclidean_distance(lat, lon,
-                                            self.map.node_to_latlon[current_node]["lat"],
-                                            self.map.node_to_latlon[current_node]["lon"])
-            if c_dist < min_distance:
-                min_distance = c_dist
-                lon_nearest = current_node
-
-        return lon_nearest
 
     # Get best driver for a given passenger by finding first availible driver
     def match(self, availible_drivers, passenger_id):
@@ -553,7 +522,7 @@ class B3_Matcher(BaseMatcher):
             del availible_drivers[min_driver]
 
             start_time = time.time()
-            driver_return_to_road = self.complete_ride(driver_id, passenger_id, pickup_time=pickup_time)
+            driver_return_to_road = self.complete_ride(driver_id, passenger_id, pickup_time=min_time)
             end_time = time.time()
             execution_time = end_time - start_time
             # print(f"complete_ride Execution time: {execution_time} seconds")
@@ -797,7 +766,7 @@ class B4_Matcher(BaseMatcher):
 
             driver_id = availible_drivers[min_driver][1]
             del availible_drivers[min_driver]
-            driver_return_to_road = self.complete_ride(driver_id, passenger_id, pickup_time=pickup_time, heuristic="manhattan")
+            driver_return_to_road = self.complete_ride(driver_id, passenger_id, pickup_time=min_time, heuristic="manhattan")
         else:
             driver_id = availible_drivers[0][1]
             del availible_drivers[0]

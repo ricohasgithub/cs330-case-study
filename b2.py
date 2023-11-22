@@ -20,8 +20,8 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
 # Contains driver states for simulation
-# b2_matcher = B2_Matcher()
-b2_matcher = B2_Default_Matcher()
+b2_matcher = B2_Matcher()
+# b2_matcher = B2_Default_Matcher()
 
 # Priority queue of availible drivers
 availible_drivers = []
@@ -103,18 +103,23 @@ plt.show()
 
 # Plot of Driver Equity
 
-# Counting the number of keys in each range
-count_0_5 = len([key for key, value in b2_matcher.numDriverRides.items() if 0 <= value <= 4])
-count_5_15 = len([key for key, value in b2_matcher.numDriverRides.items() if 4 < value <= 8])
-count_15_plus = len([key for key, value in b2_matcher.numDriverRides.items() if value > 8])
+# Initialize a list to hold the counts for each integer from 0 to 13
+counts = [0] * 14
+
+# Count the occurrences of each integer value
+for value in b2_matcher.numDriverRides.values():
+    if 0 <= value <= 13:
+        counts[value] += 1
+    elif value > 13:
+        counts[13] += 1  # Increment the last bin for all values greater than 13
 
 # Data for plotting
-ranges = ['0-4', '4-8', '9+']
-counts = [count_0_5, count_5_15, count_15_plus]
+integers = list(range(0, 14))  # Integers from 0 to 13
 
 # Plotting
-plt.bar(ranges, counts)
-plt.xlabel('Rides')
+plt.bar(integers, counts)
+plt.xlabel('Number of Rides')
 plt.ylabel('Number of Drivers')
 plt.title('Equality of Rides Assigned to Drivers')
+plt.xticks(integers)  # Set x-ticks to be each integer
 plt.show()
